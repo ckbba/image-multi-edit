@@ -1,5 +1,15 @@
 # 拾影 · 独立 Image2.5 图像编辑网站
 
+## 页面预览
+
+### 多图编辑工作区
+
+![多图编辑工作区](docs/screenshots/editor-workspace.png)
+
+### 生成结果与编辑快照
+
+![生成结果与编辑快照](docs/screenshots/history-result.png)
+
 这是可独立运行的单使用者私有网站，包含双图编辑工作区、服务端草稿、生成历史、稳定详情地址、下载、恢复原编辑和以结果继续。真实图像编辑仅使用 **65535 / gpt-image-2.5-flare**，不会自动换模型。没有生产部署。
 
 当前版本是**有真实调用证据的工程试用版**，不是完整质量验收通过版。详见 [TECH_RESEARCH.md](TECH_RESEARCH.md)、[CHECKS.md](CHECKS.md) 和 [真实图像检查](evidence/QUALITY_REVIEW.md)。
