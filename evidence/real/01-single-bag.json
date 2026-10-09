@@ -1,0 +1,98 @@
+{
+  "name": "01-single-bag",
+  "state": {
+    "schema_version": 2,
+    "name": "01 单对象 · 包",
+    "main_image": "b55a78aefba34b51afee1b5dcc69882b",
+    "references": [
+      "3081a89915c34bd891259231fdaff434"
+    ],
+    "mappings": [
+      {
+        "id": "fd1f72630ee844e4ac902a680d7d871d",
+        "display_index": 1,
+        "color": "#8b5cf6",
+        "mode": "replace",
+        "source": {
+          "image_id": "3081a89915c34bd891259231fdaff434",
+          "image_version": 1,
+          "mask_id": "e64c049f6b7f4e379f08d66198ec3195",
+          "anchor": {
+            "x": 0.5,
+            "y": 0.5
+          },
+          "label": "黑色绗缝金链包",
+          "label_source": "user"
+        },
+        "target": {
+          "image_id": "b55a78aefba34b51afee1b5dcc69882b",
+          "image_version": 1,
+          "mask_id": "0c98994920064c2eaa8d499f8c2400f0",
+          "anchor": {
+            "x": 0.41,
+            "y": 0.48
+          }
+        }
+      }
+    ],
+    "next_display_index": 2,
+    "instructions": "",
+    "id": "da16902cd60e423084c3da6331c3640f",
+    "project_id": "b9c0b5c21a6241fe8b211f5689bd69d6",
+    "revision": 0
+  },
+  "compiled": {
+    "prompt": "Edit IMAGE 1 as the base photograph. Perform all replacements listed below in ONE final photograph.\nPreserve the base camera framing, aspect ratio, identity, pose, background and everything outside the selected targets.\nEach source belongs ONLY to its listed operation. Adapt source objects naturally to target perspective, lighting and occlusion.\nCoordinates below are normalized [0,1] regions in the original images, not API control parameters.\nDo not reproduce masks, labels, guide outlines or numbered markings in the final image.\nOperation 1: use the selected object 黑色绗缝金链包 from IMAGE 2, source region [0.1396484375, 0.14912280701754385, 0.830078125, 0.8406432748538012], to REPLACE the object in IMAGE 1 target region [0.322265625, 0.42578125, 0.515625, 0.5364583333333334]. Keep the source product color, design, pattern and details. Do not copy the source background.",
+    "inputs": [
+      "b55a78aefba34b51afee1b5dcc69882b",
+      "3081a89915c34bd891259231fdaff434"
+    ],
+    "bindings": [
+      {
+        "mapping_id": "fd1f72630ee844e4ac902a680d7d871d",
+        "display_index": 1,
+        "input_index": 2,
+        "original_id": "3081a89915c34bd891259231fdaff434",
+        "input_asset_id": "3081a89915c34bd891259231fdaff434",
+        "crop": null,
+        "target_bbox": [
+          0.322265625,
+          0.42578125,
+          0.515625,
+          0.5364583333333334
+        ]
+      }
+    ],
+    "strategy": "full",
+    "compiler_version": "mapping-text-v1",
+    "model": "gpt-image-2.5-flare",
+    "mask_mode": "disabled-unverified",
+    "quality": null,
+    "size": "auto",
+    "execution": "batch-experimental"
+  },
+  "mask_experiment": null,
+  "started_at": 1791421806.938895,
+  "status": "succeeded",
+  "calls": 1,
+  "result": {
+    "outputs": [
+      {
+        "generation_id": "16a03189-a462-4bfe-b3bb-d035d23af5d8",
+        "mime_type": "image/png",
+        "size_bytes": 2380017,
+        "url": "https://task-cdn2.65535.space/?url=https%3A%2F%2Ftask1.65535.space%2Fjobs%2Fimg_758089cf13f3fface95fbf7f5d1a8dca%2F0.png"
+      }
+    ],
+    "elapsed_s": 35.703,
+    "request_id": "b399abe3-6d80-43ba-9a83-e0e5f1b230f3",
+    "usage": null,
+    "cost_usd": null,
+    "calls": 1,
+    "assets": [
+      "7971edf5632942d280c71e6f0913a4ad"
+    ]
+  },
+  "history_id": "1e010212eda14a71ba272d12c1959839",
+  "wall_s": 39.406
+}

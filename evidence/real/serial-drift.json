@@ -1,0 +1,11 @@
+{
+  "original_size": [
+    1024,
+    1536
+  ],
+  "intermediate_size": [
+    1024,
+    1536
+  ],
+  "note": "Research-only normalized coordinates; inspect alignment visually before claiming serial safe."
+}

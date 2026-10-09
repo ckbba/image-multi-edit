@@ -1,0 +1,47 @@
+{
+  "endpoint": "models",
+  "status": 200,
+  "duration_s": 0.782,
+  "records": [
+    {
+      "id": "gpt-image-2.5",
+      "object": "model",
+      "name": "gpt-image-2.5"
+    },
+    {
+      "id": "gpt-image-2.5-flare",
+      "object": "model",
+      "name": "gpt-image-2.5-flare"
+    },
+    {
+      "id": "gpt-image-2.5-sunburst",
+      "object": "model",
+      "name": "gpt-image-2.5-sunburst"
+    },
+    {
+      "id": "gpt-image-2.5-auto",
+      "object": "model",
+      "name": "gpt-image-2.5-auto"
+    },
+    {
+      "id": "gpt-image-2.5-flare-auto",
+      "object": "model",
+      "name": "gpt-image-2.5-flare-auto"
+    },
+    {
+      "id": "gpt-image-2.5-sunburst-auto",
+      "object": "model",
+      "name": "gpt-image-2.5-sunburst-auto"
+    },
+    {
+      "id": "gpt-image-2.5-flare-eco",
+      "object": "model",
+      "name": "gpt-image-2.5-flare-eco"
+    },
+    {
+      "id": "gpt-image-2.5-sunburst-eco",
+      "object": "model",
+      "name": "gpt-image-2.5-sunburst-eco"
+    }
+  ]
+}

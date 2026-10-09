@@ -1,0 +1,36 @@
+{
+  "car": {
+    "asset": {
+      "id": "eab0cf6024294ee6a055941de4367787",
+      "version": 1,
+      "width": 2646,
+      "height": 1764,
+      "name": "car.png",
+      "mime": "image/png",
+      "path": "assets/eab0cf6024294ee6a055941de4367787.png",
+      "kind": "image",
+      "origin": null,
+      "created": 1791421445.7724023,
+      "sha256": "b5708b87adc88c2b1df3e3bd8c927b784d62ee4eb62df95fda8af193c1de71de",
+      "bytes": 2631458
+    },
+    "source_url": "https://huggingface.co/ybelkada/segment-anything/resolve/main/assets/car.png"
+  },
+  "truck": {
+    "asset": {
+      "id": "4c00d7825aec4611a13b00a083bd8e4b",
+      "version": 1,
+      "width": 1800,
+      "height": 1200,
+      "name": "truck.png",
+      "mime": "image/png",
+      "path": "assets/4c00d7825aec4611a13b00a083bd8e4b.png",
+      "kind": "image",
+      "origin": null,
+      "created": 1791421448.1416233,
+      "sha256": "7c06acf9df1532742c5046abb10ce1412c31d70d7f4a5117a8b1996162c387d3",
+      "bytes": 1884203
+    },
+    "source_url": "https://raw.githubusercontent.com/facebookresearch/segment-anything/main/notebooks/images/truck.jpg"
+  }
+}

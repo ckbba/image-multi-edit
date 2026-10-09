@@ -1,0 +1,220 @@
+"""One-owner durable SQLite metadata and immutable image bytes."""
+import hashlib
+import io
+import json
+import sqlite3
+import time
+import uuid
+from contextlib import contextmanager
+from pathlib import Path
+
+import numpy as np
+from PIL import Image, ImageOps, ImageDraw
+from fastapi import HTTPException
+import config
+
+Image.MAX_IMAGE_PIXELS = 40_000_000
+
+
+def uid():
+    return uuid.uuid4().hex
+
+
+def init():
+    config.DATA.mkdir(parents=True, exist_ok=True)
+    (config.DATA / 'assets').mkdir(exist_ok=True)
+    with db() as con:
+        con.executescript('''
+        CREATE TABLE IF NOT EXISTS assets(id TEXT PRIMARY KEY, meta TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS drafts(id TEXT PRIMARY KEY, revision INTEGER NOT NULL, updated REAL NOT NULL, state TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS jobs(id TEXT PRIMARY KEY, idem TEXT UNIQUE NOT NULL, created REAL NOT NULL,
+          status TEXT NOT NULL, snapshot TEXT NOT NULL, result TEXT NOT NULL DEFAULT '{}', deleted INTEGER NOT NULL DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY, expires REAL NOT NULL);
+        ''')
+        con.execute("UPDATE jobs SET status='unknown', result=json_set(result,'$.error','服务重启中断请求；上游状态未知，不自动重复扣费。') WHERE status='running'")
+
+
+@contextmanager
+def db():
+    con = sqlite3.connect(config.DATA / 'editor.sqlite', timeout=30)
+    con.row_factory = sqlite3.Row
+    con.execute('PRAGMA journal_mode=WAL')
+    con.execute('PRAGMA synchronous=FULL')
+    try:
+        yield con
+        con.commit()
+    except BaseException:
+        con.rollback()
+        raise
+    finally:
+        con.close()
+
+
+def asset(asset_id):
+    with db() as con:
+        row = con.execute('SELECT meta FROM assets WHERE id=?', (asset_id,)).fetchone()
+    if not row:
+        raise HTTPException(404, '素材不存在或已损坏')
+    meta = json.loads(row['meta'])
+    if not (config.DATA / meta['path']).is_file():
+        raise HTTPException(409, '素材文件缺失，不能继续使用旧选区')
+    return meta
+
+
+def image(asset_id):
+    return Image.open(config.DATA / asset(asset_id)['path'])
+
+
+def persist_image(im, name, kind='image', origin=None):
+    """Every asset is a new immutable version. PNG normalization removes EXIF location data."""
+    im.load()
+    im = im.convert('RGBA' if im.mode == 'RGBA' else 'RGB')
+    buf = io.BytesIO()
+    im.save(buf, format='PNG', compress_level=1 if kind == 'mask' else 6)
+    content = buf.getvalue()
+    aid = uid()
+    relative = f'assets/{aid}.png'
+    destination = config.DATA / relative
+    temporary = destination.with_suffix('.tmp')
+    temporary.write_bytes(content)
+    temporary.replace(destination)
+    thumb = im.copy()
+    thumb.thumbnail((360, 360))
+    thumb.save(config.DATA / f'assets/{aid}.thumb.png')
+    meta = dict(id=aid, version=1, width=im.width, height=im.height, name=name[:160],
+                mime='image/png', path=relative, kind=kind, origin=origin, created=time.time(),
+                sha256=hashlib.sha256(content).hexdigest(), bytes=len(content))
+    with db() as con:
+        con.execute('INSERT INTO assets VALUES(?,?)', (aid, json.dumps(meta)))
+    return meta
+
+
+def ingest(content, name, kind='image'):
+    if not content or len(content) > 20 * 1024 * 1024:
+        raise HTTPException(400, '单张图片必须在 20 MB 以内')
+    try:
+        im = Image.open(io.BytesIO(content))
+        if im.format not in ('JPEG', 'PNG', 'WEBP') or getattr(im, 'n_frames', 1) != 1:
+            raise ValueError('只支持静态 JPEG / PNG / WebP')
+        if im.width * im.height > 24_000_000:
+            raise ValueError('当前处理上限为 2400 万像素，请先缩小图片')
+        im = ImageOps.exif_transpose(im)
+        im.load()
+    except Exception as exc:
+        raise HTTPException(400, '图片无效、动画或超过像素上限') from exc
+    return persist_image(im, name, kind)
+
+
+def mask_asset(mask, image_id, method, extra=None):
+    original = asset(image_id)
+    mask = mask.convert('L').resize((original['width'], original['height']), Image.Resampling.NEAREST)
+    if not mask.getbbox():
+        raise HTTPException(400, '选区为空，请重新选择')
+    rgba = Image.new('RGBA', mask.size, (255, 255, 255, 0))
+    rgba.putalpha(mask)
+    meta = persist_image(rgba, 'selection.png', 'mask', dict(image_id=image_id, image_version=1, method=method, **(extra or {})))
+    bbox = mask.getbbox()
+    meta['bbox'] = [bbox[0] / mask.width, bbox[1] / mask.height, bbox[2] / mask.width, bbox[3] / mask.height]
+    with db() as con:
+        con.execute('UPDATE assets SET meta=? WHERE id=?', (json.dumps(meta), meta['id']))
+    return meta
+
+
+def manual_mask(image_id, points):
+    im = asset(image_id)
+    if not 3 <= len(points) <= 500 or any(len(p) != 2 or not all(isinstance(v, (int, float)) and 0 <= v <= 1 for v in p) for p in points):
+        raise HTTPException(400, '圈选至少需要三个有效点')
+    mask = Image.new('L', (im['width'], im['height']))
+    ImageDraw.Draw(mask).polygon([(round(x * (im['width'] - 1)), round(y * (im['height'] - 1))) for x, y in points], fill=255)
+    return mask_asset(mask, image_id, 'manual-polygon', {'points': points})
+
+
+COLORS = ['#8b5cf6', '#3b82f6', '#f59e0b', '#10b981', '#ec4899']
+
+
+def validate(state, for_submit=False, allow_overlap=False):
+    mappings = state.get('mappings', [])
+    refs = state.get('references', [])
+    if len(refs) > 8 or len(mappings) > 5 or len(set(refs)) != len(refs):
+        raise HTTPException(400, '最多 8 张不同参考图和 5 条有效编辑')
+    if len(state.get('instructions', '')) > 2000 or len(state.get('name', '')) > 100:
+        raise HTTPException(400, '项目名或补充要求过长')
+    if state.get('source_strategy', 'full') not in ('full', 'context-crop', 'transparent'):
+        raise HTTPException(400, '请选择完整参考图或带上下文裁剪')
+    main = state.get('main_image')
+    for aid in ([main] if main else []) + refs:
+        if asset(aid)['kind'] not in ('image', 'output'):
+            raise HTTPException(400, '主图和参考图必须是图像素材')
+    ids, numbers = set(), set()
+    masks = []
+    for mapping in mappings:
+        number = mapping['display_index']
+        if mapping['id'] in ids or number in numbers or not isinstance(number, int) or number < 1:
+            raise HTTPException(400, '关系 ID 和编号必须唯一且稳定')
+        ids.add(mapping['id']); numbers.add(number)
+        if mapping.get('color') != COLORS[(number - 1) % 5]:
+            raise HTTPException(400, '关系编号与颜色不一致')
+        if len(mapping['source'].get('label', '')) > 10:
+            raise HTTPException(400, '物品名称最多 10 字')
+        for side in ('source', 'target'):
+            data = mapping[side]
+            expected = refs if side == 'source' else [main]
+            if data.get('image_id') not in expected or data.get('image_version') != 1:
+                raise HTTPException(400, '关系指向失效的素材版本')
+            for mask_id in set([data['mask_id'], data.get('edit_region_id', data['mask_id'])]):
+                ma = asset(mask_id)
+                if ma['kind'] != 'mask' or ma['origin']['image_id'] != data['image_id']:
+                    raise HTTPException(400, '选区与素材版本不匹配')
+            anchor = data.get('anchor', {})
+            if not all(isinstance(anchor.get(k), (int, float)) and 0 <= anchor[k] <= 1 for k in ('x', 'y')):
+                raise HTTPException(400, '锚点必须在图像内')
+            mask = image(data['mask_id']).getchannel('A')
+            if mask.getpixel((min(mask.width - 1, int(anchor['x'] * mask.width)), min(mask.height - 1, int(anchor['y'] * mask.height)))) == 0:
+                raise HTTPException(400, '锚点不在确认选区内，请重新选择或拖拽')
+        target = image(mapping['target'].get('edit_region_id', mapping['target']['mask_id'])).getchannel('A')
+        # Native resolution, not bbox intersection: touching polygon boxes is not a conflict.
+        masks.append((number, np.asarray(target) > 0))
+    conflicts = []
+    for i, (a, ma) in enumerate(masks):
+        for b, mb in masks[i + 1:]:
+            ratio = float(np.count_nonzero(ma & mb) / max(1, min(np.count_nonzero(ma), np.count_nonzero(mb))))
+            if ratio > 0.05:
+                conflicts.append({'a': a, 'b': b, 'overlap': round(ratio, 4), 'duplicate': ratio > 0.85})
+    if state.get('next_display_index', 1) <= max(numbers, default=0):
+        raise HTTPException(400, '下个编号必须大于已分配编号')
+    if for_submit and (not main or not mappings):
+        raise HTTPException(400, '请准备主图和至少一条有效编辑关系')
+    if for_submit and conflicts and not allow_overlap:
+        raise HTTPException(409, {'code': 'target_overlap_confirmation_required',
+            'message': '目标选区存在重叠，确认可能影响效果后仍可生成', 'conflicts': conflicts})
+    return conflicts
+
+
+def new_draft(state=None):
+    state = json.loads(json.dumps(state)) if state else dict(schema_version=2, name='未命名编辑', main_image=None,
+        references=[], mappings=[], next_display_index=1, instructions='')
+    state['id'] = uid()
+    state['project_id'] = state.get('project_id', uid())
+    state['revision'] = 0
+    state['schema_version'] = 2
+    state.setdefault('references', [])
+    state.setdefault('next_display_index', max([m['display_index'] for m in state.get('mappings', [])], default=0) + 1)
+    with db() as con:
+        con.execute('INSERT INTO drafts VALUES(?,?,?,?)', (state['id'], 0, time.time(), json.dumps(state)))
+    return state
+
+
+def job(jid, include_deleted=False):
+    with db() as con:
+        row = con.execute('SELECT * FROM jobs WHERE id=?', (jid,)).fetchone()
+    if not row or (row['deleted'] and not include_deleted):
+        raise HTTPException(404, '历史不存在')
+    result = dict(row)
+    result['snapshot'] = json.loads(row['snapshot'])
+    result['result'] = json.loads(row['result'])
+    return result
+
+
+def update_job(jid, status, result):
+    with db() as con:
+        con.execute('UPDATE jobs SET status=?,result=? WHERE id=?', (status, json.dumps(result), jid))

@@ -1,0 +1,253 @@
+{
+  "name": "08-three-b",
+  "state": {
+    "schema_version": 2,
+    "name": "08 三对象 · 双手提包和眼镜",
+    "main_image": "4356db180a18475e800788561268c1dd",
+    "references": [
+      "3081a89915c34bd891259231fdaff434",
+      "b55a78aefba34b51afee1b5dcc69882b"
+    ],
+    "mappings": [
+      {
+        "id": "8c7a543bd791479f82987f46e0a6f673",
+        "display_index": 1,
+        "color": "#8b5cf6",
+        "mode": "replace",
+        "source": {
+          "image_id": "3081a89915c34bd891259231fdaff434",
+          "image_version": 1,
+          "mask_id": "e64c049f6b7f4e379f08d66198ec3195",
+          "anchor": {
+            "x": 0.5,
+            "y": 0.5
+          },
+          "label": "黑色绗缝金链包",
+          "label_source": "user"
+        },
+        "target": {
+          "image_id": "4356db180a18475e800788561268c1dd",
+          "image_version": 1,
+          "mask_id": "0a5d34d9456f4e34ad48b08ec40d5d43",
+          "anchor": {
+            "x": 0.28,
+            "y": 0.78
+          }
+        }
+      },
+      {
+        "id": "2d696b8381e747019d47a8cc09c3f21d",
+        "display_index": 2,
+        "color": "#3b82f6",
+        "mode": "replace",
+        "source": {
+          "image_id": "3081a89915c34bd891259231fdaff434",
+          "image_version": 1,
+          "mask_id": "e64c049f6b7f4e379f08d66198ec3195",
+          "anchor": {
+            "x": 0.5,
+            "y": 0.5
+          },
+          "label": "黑色绗缝金链包",
+          "label_source": "user"
+        },
+        "target": {
+          "image_id": "4356db180a18475e800788561268c1dd",
+          "image_version": 1,
+          "mask_id": "cff3c2060bf546289e0ba3bf92e01040",
+          "anchor": {
+            "x": 0.9,
+            "y": 0.85
+          }
+        }
+      },
+      {
+        "id": "f0a5a563d6b246289ff1d74b4b6cafb2",
+        "display_index": 3,
+        "color": "#f59e0b",
+        "mode": "replace",
+        "source": {
+          "image_id": "b55a78aefba34b51afee1b5dcc69882b",
+          "image_version": 1,
+          "mask_id": "f24c7adab8a64c318174324f3e59da86",
+          "anchor": {
+            "x": 0.465,
+            "y": 0.229
+          },
+          "label": "猫眼太阳镜",
+          "label_source": "user"
+        },
+        "target": {
+          "image_id": "4356db180a18475e800788561268c1dd",
+          "image_version": 1,
+          "mask_id": "55d51a6c876e47b299bc8ec7df114f83",
+          "anchor": {
+            "x": 0.58,
+            "y": 0.34
+          }
+        }
+      }
+    ],
+    "next_display_index": 4,
+    "instructions": "",
+    "id": "635537bf67ef4a059f46c93202003a0b",
+    "project_id": "0105902d643f4f74bba9d3ef492e506b",
+    "revision": 0
+  },
+  "compiled": {
+    "prompt": "Edit IMAGE 1 as the base photograph. Perform all replacements listed below in ONE final photograph.\nPreserve the base camera framing, aspect ratio, identity, pose, background and everything outside the selected targets.\nEach source belongs ONLY to its listed operation. Adapt source objects naturally to target perspective, lighting and occlusion.\nCoordinates below are normalized [0,1] regions in the original images, not API control parameters.\nDo not reproduce masks, labels, guide outlines or numbered markings in the final image.\nOperation 1: use the selected object 黑色绗缝金链包 from IMAGE 2, source region the central selected object in the crop, to REPLACE the object in IMAGE 1 target region [0.080078125, 0.4787701317715959, 0.400390625, 0.9487554904831625]. Keep the source product color, design, pattern and details. Do not copy the source background.\nOperation 2: use the selected object 黑色绗缝金链包 from IMAGE 3, source region the central selected object in the crop, to REPLACE the object in IMAGE 1 target region [0.7177734375, 0.5988286969253295, 0.998046875, 0.9970717423133236]. Keep the source product color, design, pattern and details. Do not copy the source background.\nOperation 3: use the selected object 猫眼太阳镜 from IMAGE 4, source region the central selected object in the crop, to REPLACE the object in IMAGE 1 target region [0.509765625, 0.3001464128843338, 0.640625, 0.3806734992679356]. Keep the source product color, design, pattern and details. Do not copy the source background.",
+    "inputs": [
+      "4356db180a18475e800788561268c1dd",
+      "092a3d5ae0484fa182ea19e7f9ff1f88",
+      "b3ca7698f910455882d5756f705055aa",
+      "1511f617bb6c4bef9746d11bfcda9e1d"
+    ],
+    "bindings": [
+      {
+        "mapping_id": "8c7a543bd791479f82987f46e0a6f673",
+        "display_index": 1,
+        "input_index": 2,
+        "original_id": "3081a89915c34bd891259231fdaff434",
+        "input_asset_id": "092a3d5ae0484fa182ea19e7f9ff1f88",
+        "crop": {
+          "id": "092a3d5ae0484fa182ea19e7f9ff1f88",
+          "version": 1,
+          "width": 821,
+          "height": 549,
+          "name": "source-1.png",
+          "mime": "image/png",
+          "path": "assets/092a3d5ae0484fa182ea19e7f9ff1f88.png",
+          "kind": "crop",
+          "origin": {
+            "image_id": "3081a89915c34bd891259231fdaff434",
+            "box_pixels": [
+              86,
+              64,
+              907,
+              613
+            ],
+            "margin_fraction": 0.08,
+            "strategy": "context-crop",
+            "strategy_version": 1
+          },
+          "created": 1791422907.6888332,
+          "sha256": "394667c6763f96f68ddb6b03a6be9e3df280c0f16c8056015c349fa08cc7f75f",
+          "bytes": 417511
+        },
+        "target_bbox": [
+          0.080078125,
+          0.4787701317715959,
+          0.400390625,
+          0.9487554904831625
+        ]
+      },
+      {
+        "mapping_id": "2d696b8381e747019d47a8cc09c3f21d",
+        "display_index": 2,
+        "input_index": 3,
+        "original_id": "3081a89915c34bd891259231fdaff434",
+        "input_asset_id": "b3ca7698f910455882d5756f705055aa",
+        "crop": {
+          "id": "b3ca7698f910455882d5756f705055aa",
+          "version": 1,
+          "width": 821,
+          "height": 549,
+          "name": "source-2.png",
+          "mime": "image/png",
+          "path": "assets/b3ca7698f910455882d5756f705055aa.png",
+          "kind": "crop",
+          "origin": {
+            "image_id": "3081a89915c34bd891259231fdaff434",
+            "box_pixels": [
+              86,
+              64,
+              907,
+              613
+            ],
+            "margin_fraction": 0.08,
+            "strategy": "context-crop",
+            "strategy_version": 1
+          },
+          "created": 1791422907.7982953,
+          "sha256": "394667c6763f96f68ddb6b03a6be9e3df280c0f16c8056015c349fa08cc7f75f",
+          "bytes": 417511
+        },
+        "target_bbox": [
+          0.7177734375,
+          0.5988286969253295,
+          0.998046875,
+          0.9970717423133236
+        ]
+      },
+      {
+        "mapping_id": "f0a5a563d6b246289ff1d74b4b6cafb2",
+        "display_index": 3,
+        "input_index": 4,
+        "original_id": "b55a78aefba34b51afee1b5dcc69882b",
+        "input_asset_id": "1511f617bb6c4bef9746d11bfcda9e1d",
+        "crop": {
+          "id": "1511f617bb6c4bef9746d11bfcda9e1d",
+          "version": 1,
+          "width": 115,
+          "height": 43,
+          "name": "source-3.png",
+          "mime": "image/png",
+          "path": "assets/1511f617bb6c4bef9746d11bfcda9e1d.png",
+          "kind": "crop",
+          "origin": {
+            "image_id": "b55a78aefba34b51afee1b5dcc69882b",
+            "box_pixels": [
+              422,
+              329,
+              537,
+              372
+            ],
+            "margin_fraction": 0.08,
+            "strategy": "context-crop",
+            "strategy_version": 1
+          },
+          "created": 1791422907.8617482,
+          "sha256": "954ec452887c1bbee1cdcfdc348af28162b53a27c34b618f425891500d07ec44",
+          "bytes": 13481
+        },
+        "target_bbox": [
+          0.509765625,
+          0.3001464128843338,
+          0.640625,
+          0.3806734992679356
+        ]
+      }
+    ],
+    "strategy": "context-crop",
+    "compiler_version": "mapping-text-v1",
+    "model": "gpt-image-2.5-flare",
+    "mask_mode": "disabled-unverified",
+    "quality": null,
+    "size": "auto",
+    "execution": "batch-experimental"
+  },
+  "mask_experiment": null,
+  "started_at": 1791422907.8719096,
+  "status": "succeeded",
+  "calls": 1,
+  "result": {
+    "outputs": [
+      {
+        "generation_id": "5be56b18-3b2e-4013-b430-67d22d1d2691",
+        "mime_type": "image/png",
+        "size_bytes": 1929881,
+        "url": "https://task-cdn2.65535.space/?url=https%3A%2F%2Ftask1.65535.space%2Fjobs%2Fimg_99525c78cde140224aa8520ec037cf2a%2F0.png"
+      }
+    ],
+    "elapsed_s": 49.812,
+    "request_id": "f98789bf-e1ed-4a51-8aa2-13700e34fa81",
+    "usage": null,
+    "cost_usd": null,
+    "calls": 1,
+    "assets": [
+      "d802fa9e1e3e47539d730f75e1550fa3"
+    ]
+  },
+  "history_id": "c45d237e20ed459c83d6173030d0b7a4",
+  "wall_s": 53.39
+}

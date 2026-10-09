@@ -1,0 +1,142 @@
+[
+  {
+    "sample": "car",
+    "prepare": {
+      "ready": true,
+      "elapsed_ms": 23069.25,
+      "device": "cuda:0"
+    },
+    "point": [
+      0.4,
+      0.5
+    ],
+    "elapsed_ms": 970.53,
+    "candidate_count": 3
+  },
+  {
+    "sample": "car",
+    "prepare": {
+      "ready": true,
+      "elapsed_ms": 23069.25,
+      "device": "cuda:0"
+    },
+    "point": [
+      0.3,
+      0.6
+    ],
+    "elapsed_ms": 614.03,
+    "candidate_count": 3
+  },
+  {
+    "sample": "car",
+    "prepare": {
+      "ready": true,
+      "elapsed_ms": 23069.25,
+      "device": "cuda:0"
+    },
+    "point": [
+      0.5,
+      0.6
+    ],
+    "elapsed_ms": 431.2,
+    "candidate_count": 2
+  },
+  {
+    "sample": "car",
+    "prepare": {
+      "ready": true,
+      "elapsed_ms": 23069.25,
+      "device": "cuda:0"
+    },
+    "point": [
+      0.6,
+      0.5
+    ],
+    "elapsed_ms": 694.16,
+    "candidate_count": 3
+  },
+  {
+    "sample": "car",
+    "prepare": {
+      "ready": true,
+      "elapsed_ms": 23069.25,
+      "device": "cuda:0"
+    },
+    "point": [
+      0.7,
+      0.6
+    ],
+    "elapsed_ms": 607.97,
+    "candidate_count": 3
+  },
+  {
+    "sample": "truck",
+    "prepare": {
+      "ready": true,
+      "elapsed_ms": 354.11,
+      "device": "cuda:0"
+    },
+    "point": [
+      0.4,
+      0.5
+    ],
+    "elapsed_ms": 445.98,
+    "candidate_count": 3
+  },
+  {
+    "sample": "truck",
+    "prepare": {
+      "ready": true,
+      "elapsed_ms": 354.11,
+      "device": "cuda:0"
+    },
+    "point": [
+      0.3,
+      0.6
+    ],
+    "elapsed_ms": 326.84,
+    "candidate_count": 3
+  },
+  {
+    "sample": "truck",
+    "prepare": {
+      "ready": true,
+      "elapsed_ms": 354.11,
+      "device": "cuda:0"
+    },
+    "point": [
+      0.5,
+      0.6
+    ],
+    "elapsed_ms": 137.11,
+    "candidate_count": 1
+  },
+  {
+    "sample": "truck",
+    "prepare": {
+      "ready": true,
+      "elapsed_ms": 354.11,
+      "device": "cuda:0"
+    },
+    "point": [
+      0.6,
+      0.5
+    ],
+    "elapsed_ms": 358.14,
+    "candidate_count": 3
+  },
+  {
+    "sample": "truck",
+    "prepare": {
+      "ready": true,
+      "elapsed_ms": 354.11,
+      "device": "cuda:0"
+    },
+    "point": [
+      0.7,
+      0.6
+    ],
+    "elapsed_ms": 394.02,
+    "candidate_count": 3
+  }
+]

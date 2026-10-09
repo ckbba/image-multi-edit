@@ -1,0 +1,118 @@
+{
+  "history_count": 20,
+  "checks": [
+    {
+      "history_id": "0f1ab91da382429ba5803f142798bdb4",
+      "assets_verified": 5,
+      "new_draft_id": "8b26f8b2e72a474fa307e13681e74f24"
+    },
+    {
+      "history_id": "10c4e18edb654fb6b7e723bf3dc8ee0c",
+      "assets_verified": 8,
+      "new_draft_id": "8afd99e68d86448f97e6c3e6362b8608"
+    },
+    {
+      "history_id": "1e010212eda14a71ba272d12c1959839",
+      "assets_verified": 5,
+      "new_draft_id": "785dc2bf7d714d14af491b2a093f492b"
+    },
+    {
+      "history_id": "25e7c7469026463a992d1efb86bbf5cd",
+      "assets_verified": 8,
+      "new_draft_id": "a46dd5fd84894ba6811255f91069a82e"
+    },
+    {
+      "history_id": "36a45ed88396497aa60b243c0502c6e3",
+      "assets_verified": 5,
+      "new_draft_id": "8fdf3ab9729348029765933fcb3fb9dc"
+    },
+    {
+      "history_id": "38c370915cd943ad9df485a6bb650c58",
+      "assets_verified": 5,
+      "new_draft_id": "8fc834a1c59143089e615b6de421a1fc"
+    },
+    {
+      "history_id": "3d428640269147fbba4ab8a293bfca11",
+      "assets_verified": 5,
+      "new_draft_id": "d349696812494c418b9b19ef4973a0c8"
+    },
+    {
+      "history_id": "3e920c88f6a54f54a7e7d5bbe5f8d07f",
+      "assets_verified": 5,
+      "new_draft_id": "f104509a51c64513a3b5ab307525b50b"
+    },
+    {
+      "history_id": "447f7b06c67849f9b32104e10e0cf742",
+      "assets_verified": 8,
+      "new_draft_id": "1ca4ce90b05744f2a4b3a5cb6fa39e3d"
+    },
+    {
+      "history_id": "472c292bc9104bcdbe7d6a53bcfa7473",
+      "assets_verified": 8,
+      "new_draft_id": "64d06b84325940e18035dbbdc45afd00"
+    },
+    {
+      "history_id": "6fb23cda0d704ecc8d3ba7bcbf6b53b5",
+      "assets_verified": 5,
+      "new_draft_id": "f273ed5bdba442ce8c9c11bcc764a293"
+    },
+    {
+      "history_id": "766204dad5d648c08b7c2637e123bc16",
+      "assets_verified": 11,
+      "new_draft_id": "6b7015b076f84c0d8881857aa39bbb38"
+    },
+    {
+      "history_id": "76f7426354c14149a585b465e62dc2c5",
+      "assets_verified": 5,
+      "new_draft_id": "72dce4344d27449fbdc999f1d43262cd"
+    },
+    {
+      "history_id": "9da466b5c0dc4e9381f1da5d36ddb664",
+      "assets_verified": 8,
+      "new_draft_id": "c0fc92bd874d4d0bbe9a72997987112a"
+    },
+    {
+      "history_id": "9ff1aefc827a4dabb3b00f9af9a322e4",
+      "assets_verified": 5,
+      "new_draft_id": "22b812b7b4c14d4693f77df94644d617"
+    },
+    {
+      "history_id": "a813ec9f71db42059803247b7720cccb",
+      "assets_verified": 6,
+      "new_draft_id": "cbd22ebb1ca848efb11078c98a2330d0"
+    },
+    {
+      "history_id": "be3ca3741774462ab4fa0dba61b79f89",
+      "assets_verified": 5,
+      "new_draft_id": "c6dd2a2ea4964735bbbe45d6cf4cea31"
+    },
+    {
+      "history_id": "c2d6453641e74e568fee97e89e231d01",
+      "assets_verified": 6,
+      "new_draft_id": "fa7baad7cceb407c8ee5c7bbe67d7278"
+    },
+    {
+      "history_id": "c45d237e20ed459c83d6173030d0b7a4",
+      "assets_verified": 9,
+      "new_draft_id": "6958e8998f6049128bba434788e51e0d"
+    },
+    {
+      "history_id": "f3797e89870b4d129dc7a58937b5ef34",
+      "assets_verified": 8,
+      "new_draft_id": "b43863669c0942e6a8fb0c87e0f5ee53"
+    }
+  ],
+  "browser_console_errors": [],
+  "browser_generation_requests": [],
+  "browser_external_requests": [],
+  "verified": [
+    "actual server restart / immutable snapshot and output metadata hashes",
+    "all real inputs, references, masks and outputs served as local bytes with matching SHA256",
+    "all real records restore into new valid drafts",
+    "fresh browser context (no previous cache, cookies or local storage), new login",
+    "stable detail reload, zoom and original output download",
+    "result as new main with empty mappings; original restore with two mappings",
+    "no new jobs and unchanged historical snapshots/results"
+  ],
+  "limit": "Real upstream URLs were not forcibly expired. A controlled expiry/save-failure integration test covers that state; this check blocks browser external requests and verifies durable bytes."
+}

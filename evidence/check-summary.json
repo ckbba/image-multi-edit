@@ -1,0 +1,22 @@
+{
+  "date": "2026-10-08",
+  "backend": {
+    "command": "python -m pytest tests/test_backend.py -q -p no:cacheprovider",
+    "passed": 9,
+    "failed": 0
+  },
+  "frontend_core": {
+    "command": "node --test tests/core.test.mjs",
+    "passed": 3,
+    "failed": 0
+  },
+  "syntax": [
+    "node --check 前端代码/app.js",
+    "python -m compileall -q 后端代码 scripts run.py"
+  ],
+  "browser_evidence": "output/playwright/browser-check.json",
+  "real_history_evidence": "evidence/real-history-check.json",
+  "real_generation_calls": 20,
+  "quality_acceptance": "pending product review; known failures retained",
+  "hover_300ms_target": "not met"
+}

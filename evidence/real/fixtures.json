@@ -1,0 +1,600 @@
+{
+  "01-single-bag": {
+    "schema_version": 2,
+    "name": "01 单对象 · 包",
+    "main_image": "b55a78aefba34b51afee1b5dcc69882b",
+    "references": [
+      "3081a89915c34bd891259231fdaff434"
+    ],
+    "mappings": [
+      {
+        "id": "fd1f72630ee844e4ac902a680d7d871d",
+        "display_index": 1,
+        "color": "#8b5cf6",
+        "mode": "replace",
+        "source": {
+          "image_id": "3081a89915c34bd891259231fdaff434",
+          "image_version": 1,
+          "mask_id": "e64c049f6b7f4e379f08d66198ec3195",
+          "anchor": {
+            "x": 0.5,
+            "y": 0.5
+          },
+          "label": "黑色绗缝金链包",
+          "label_source": "user"
+        },
+        "target": {
+          "image_id": "b55a78aefba34b51afee1b5dcc69882b",
+          "image_version": 1,
+          "mask_id": "0c98994920064c2eaa8d499f8c2400f0",
+          "anchor": {
+            "x": 0.41,
+            "y": 0.48
+          }
+        }
+      }
+    ],
+    "next_display_index": 2,
+    "instructions": "",
+    "id": "da16902cd60e423084c3da6331c3640f",
+    "project_id": "b9c0b5c21a6241fe8b211f5689bd69d6",
+    "revision": 0
+  },
+  "02-single-shoes": {
+    "schema_version": 2,
+    "name": "02 单对象 · 鞋",
+    "main_image": "b55a78aefba34b51afee1b5dcc69882b",
+    "references": [
+      "34efd17be0494c6698fb120157eaab3d"
+    ],
+    "mappings": [
+      {
+        "id": "6922324be80548d3851c53561f49bad1",
+        "display_index": 1,
+        "color": "#8b5cf6",
+        "mode": "replace",
+        "source": {
+          "image_id": "34efd17be0494c6698fb120157eaab3d",
+          "image_version": 1,
+          "mask_id": "dadfa976fe704337872200b9bc1b8f31",
+          "anchor": {
+            "x": 0.53,
+            "y": 0.5
+          },
+          "label": "红色运动鞋",
+          "label_source": "user"
+        },
+        "target": {
+          "image_id": "b55a78aefba34b51afee1b5dcc69882b",
+          "image_version": 1,
+          "mask_id": "5cef8f4d0642445a8ee7bbe88eae3213",
+          "anchor": {
+            "x": 0.43,
+            "y": 0.89
+          }
+        }
+      }
+    ],
+    "next_display_index": 2,
+    "instructions": "",
+    "id": "f1e8d1feaeae46c883dab7e0d450b0c4",
+    "project_id": "0a03fdd76b4549ceb22502da66be4166",
+    "revision": 0
+  },
+  "03-single-glasses": {
+    "schema_version": 2,
+    "name": "03 单对象 · 眼镜",
+    "main_image": "b55a78aefba34b51afee1b5dcc69882b",
+    "references": [
+      "4356db180a18475e800788561268c1dd"
+    ],
+    "mappings": [
+      {
+        "id": "b2780f34c66643bd8c36cb2fe3876a40",
+        "display_index": 1,
+        "color": "#8b5cf6",
+        "mode": "replace",
+        "source": {
+          "image_id": "4356db180a18475e800788561268c1dd",
+          "image_version": 1,
+          "mask_id": "aabe8c89da90443f8d123f68437df7c4",
+          "anchor": {
+            "x": 0.58,
+            "y": 0.34
+          },
+          "label": "黑色太阳镜",
+          "label_source": "user"
+        },
+        "target": {
+          "image_id": "b55a78aefba34b51afee1b5dcc69882b",
+          "image_version": 1,
+          "mask_id": "d61f1dc0d4d140c4a7a5f1c88a22ecb8",
+          "anchor": {
+            "x": 0.465,
+            "y": 0.229
+          }
+        }
+      }
+    ],
+    "next_display_index": 2,
+    "instructions": "",
+    "id": "f6abc83766714fe192851e165fe920c0",
+    "project_id": "32569d3417f04a57b5306f04417c7108",
+    "revision": 0
+  },
+  "04-two-bag-shoes": {
+    "schema_version": 2,
+    "name": "04 两对象 · 包和鞋",
+    "main_image": "b55a78aefba34b51afee1b5dcc69882b",
+    "references": [
+      "3081a89915c34bd891259231fdaff434",
+      "34efd17be0494c6698fb120157eaab3d"
+    ],
+    "mappings": [
+      {
+        "id": "734f1aa8403e46e6b7c2d32d9e556359",
+        "display_index": 1,
+        "color": "#8b5cf6",
+        "mode": "replace",
+        "source": {
+          "image_id": "3081a89915c34bd891259231fdaff434",
+          "image_version": 1,
+          "mask_id": "e64c049f6b7f4e379f08d66198ec3195",
+          "anchor": {
+            "x": 0.5,
+            "y": 0.5
+          },
+          "label": "黑色绗缝金链包",
+          "label_source": "user"
+        },
+        "target": {
+          "image_id": "b55a78aefba34b51afee1b5dcc69882b",
+          "image_version": 1,
+          "mask_id": "0c98994920064c2eaa8d499f8c2400f0",
+          "anchor": {
+            "x": 0.41,
+            "y": 0.48
+          }
+        }
+      },
+      {
+        "id": "6a7fde17f7d743c0a855502dc80cb0ef",
+        "display_index": 2,
+        "color": "#3b82f6",
+        "mode": "replace",
+        "source": {
+          "image_id": "34efd17be0494c6698fb120157eaab3d",
+          "image_version": 1,
+          "mask_id": "dadfa976fe704337872200b9bc1b8f31",
+          "anchor": {
+            "x": 0.53,
+            "y": 0.5
+          },
+          "label": "红色运动鞋",
+          "label_source": "user"
+        },
+        "target": {
+          "image_id": "b55a78aefba34b51afee1b5dcc69882b",
+          "image_version": 1,
+          "mask_id": "5cef8f4d0642445a8ee7bbe88eae3213",
+          "anchor": {
+            "x": 0.43,
+            "y": 0.89
+          }
+        }
+      }
+    ],
+    "next_display_index": 3,
+    "instructions": "",
+    "id": "f8e708e5664a42ef8f7fa939d432310c",
+    "project_id": "279f980b40314e8eb67ef4a7582cd23a",
+    "revision": 0
+  },
+  "05-two-bag-glasses": {
+    "schema_version": 2,
+    "name": "05 两对象 · 包和眼镜",
+    "main_image": "b55a78aefba34b51afee1b5dcc69882b",
+    "references": [
+      "3081a89915c34bd891259231fdaff434",
+      "4356db180a18475e800788561268c1dd"
+    ],
+    "mappings": [
+      {
+        "id": "e1bb7dd149f34c67ae0edaa0fcb227a9",
+        "display_index": 1,
+        "color": "#8b5cf6",
+        "mode": "replace",
+        "source": {
+          "image_id": "3081a89915c34bd891259231fdaff434",
+          "image_version": 1,
+          "mask_id": "e64c049f6b7f4e379f08d66198ec3195",
+          "anchor": {
+            "x": 0.5,
+            "y": 0.5
+          },
+          "label": "黑色绗缝金链包",
+          "label_source": "user"
+        },
+        "target": {
+          "image_id": "b55a78aefba34b51afee1b5dcc69882b",
+          "image_version": 1,
+          "mask_id": "0c98994920064c2eaa8d499f8c2400f0",
+          "anchor": {
+            "x": 0.41,
+            "y": 0.48
+          }
+        }
+      },
+      {
+        "id": "43427e41f3034056aca71da53db7c1c0",
+        "display_index": 2,
+        "color": "#3b82f6",
+        "mode": "replace",
+        "source": {
+          "image_id": "4356db180a18475e800788561268c1dd",
+          "image_version": 1,
+          "mask_id": "aabe8c89da90443f8d123f68437df7c4",
+          "anchor": {
+            "x": 0.58,
+            "y": 0.34
+          },
+          "label": "黑色太阳镜",
+          "label_source": "user"
+        },
+        "target": {
+          "image_id": "b55a78aefba34b51afee1b5dcc69882b",
+          "image_version": 1,
+          "mask_id": "d61f1dc0d4d140c4a7a5f1c88a22ecb8",
+          "anchor": {
+            "x": 0.465,
+            "y": 0.229
+          }
+        }
+      }
+    ],
+    "next_display_index": 3,
+    "instructions": "",
+    "id": "8f9400c8ba5143f599a89fe879a369c6",
+    "project_id": "40c7e557840a446d95cbf310cc588817",
+    "revision": 0
+  },
+  "06-two-shoes-glasses": {
+    "schema_version": 2,
+    "name": "06 两对象 · 鞋和眼镜",
+    "main_image": "b55a78aefba34b51afee1b5dcc69882b",
+    "references": [
+      "34efd17be0494c6698fb120157eaab3d",
+      "4356db180a18475e800788561268c1dd"
+    ],
+    "mappings": [
+      {
+        "id": "5ddca492678e4092b04f303b975bd7ba",
+        "display_index": 1,
+        "color": "#8b5cf6",
+        "mode": "replace",
+        "source": {
+          "image_id": "34efd17be0494c6698fb120157eaab3d",
+          "image_version": 1,
+          "mask_id": "dadfa976fe704337872200b9bc1b8f31",
+          "anchor": {
+            "x": 0.53,
+            "y": 0.5
+          },
+          "label": "红色运动鞋",
+          "label_source": "user"
+        },
+        "target": {
+          "image_id": "b55a78aefba34b51afee1b5dcc69882b",
+          "image_version": 1,
+          "mask_id": "5cef8f4d0642445a8ee7bbe88eae3213",
+          "anchor": {
+            "x": 0.43,
+            "y": 0.89
+          }
+        }
+      },
+      {
+        "id": "6f03e3c4f7984e3999ce54fc623a4def",
+        "display_index": 2,
+        "color": "#3b82f6",
+        "mode": "replace",
+        "source": {
+          "image_id": "4356db180a18475e800788561268c1dd",
+          "image_version": 1,
+          "mask_id": "aabe8c89da90443f8d123f68437df7c4",
+          "anchor": {
+            "x": 0.58,
+            "y": 0.34
+          },
+          "label": "黑色太阳镜",
+          "label_source": "user"
+        },
+        "target": {
+          "image_id": "b55a78aefba34b51afee1b5dcc69882b",
+          "image_version": 1,
+          "mask_id": "d61f1dc0d4d140c4a7a5f1c88a22ecb8",
+          "anchor": {
+            "x": 0.465,
+            "y": 0.229
+          }
+        }
+      }
+    ],
+    "next_display_index": 3,
+    "instructions": "",
+    "id": "f2b6ff9f9e054cec90cecac8127c9679",
+    "project_id": "75f883d7e2b8446aa4e1efbaaaa77592",
+    "revision": 0
+  },
+  "07-three-a": {
+    "schema_version": 2,
+    "name": "07 三对象 · 包鞋眼镜",
+    "main_image": "b55a78aefba34b51afee1b5dcc69882b",
+    "references": [
+      "3081a89915c34bd891259231fdaff434",
+      "34efd17be0494c6698fb120157eaab3d",
+      "4356db180a18475e800788561268c1dd"
+    ],
+    "mappings": [
+      {
+        "id": "17d98724f4b94e80af634ad16fb9f7a5",
+        "display_index": 1,
+        "color": "#8b5cf6",
+        "mode": "replace",
+        "source": {
+          "image_id": "3081a89915c34bd891259231fdaff434",
+          "image_version": 1,
+          "mask_id": "e64c049f6b7f4e379f08d66198ec3195",
+          "anchor": {
+            "x": 0.5,
+            "y": 0.5
+          },
+          "label": "黑色绗缝金链包",
+          "label_source": "user"
+        },
+        "target": {
+          "image_id": "b55a78aefba34b51afee1b5dcc69882b",
+          "image_version": 1,
+          "mask_id": "0c98994920064c2eaa8d499f8c2400f0",
+          "anchor": {
+            "x": 0.41,
+            "y": 0.48
+          }
+        }
+      },
+      {
+        "id": "03a7e3bd6dee456bb2ac11fd91046977",
+        "display_index": 2,
+        "color": "#3b82f6",
+        "mode": "replace",
+        "source": {
+          "image_id": "34efd17be0494c6698fb120157eaab3d",
+          "image_version": 1,
+          "mask_id": "dadfa976fe704337872200b9bc1b8f31",
+          "anchor": {
+            "x": 0.53,
+            "y": 0.5
+          },
+          "label": "红色运动鞋",
+          "label_source": "user"
+        },
+        "target": {
+          "image_id": "b55a78aefba34b51afee1b5dcc69882b",
+          "image_version": 1,
+          "mask_id": "5cef8f4d0642445a8ee7bbe88eae3213",
+          "anchor": {
+            "x": 0.43,
+            "y": 0.89
+          }
+        }
+      },
+      {
+        "id": "27c402f5b4244c1aa30ce4773f46c2ad",
+        "display_index": 3,
+        "color": "#f59e0b",
+        "mode": "replace",
+        "source": {
+          "image_id": "4356db180a18475e800788561268c1dd",
+          "image_version": 1,
+          "mask_id": "aabe8c89da90443f8d123f68437df7c4",
+          "anchor": {
+            "x": 0.58,
+            "y": 0.34
+          },
+          "label": "黑色太阳镜",
+          "label_source": "user"
+        },
+        "target": {
+          "image_id": "b55a78aefba34b51afee1b5dcc69882b",
+          "image_version": 1,
+          "mask_id": "d61f1dc0d4d140c4a7a5f1c88a22ecb8",
+          "anchor": {
+            "x": 0.465,
+            "y": 0.229
+          }
+        }
+      }
+    ],
+    "next_display_index": 4,
+    "instructions": "",
+    "id": "19cbc405a2d24352ab01b2fcfcbc9d4f",
+    "project_id": "65a51dccee094b748974aea8eaf47c1c",
+    "revision": 0
+  },
+  "08-three-b": {
+    "schema_version": 2,
+    "name": "08 三对象 · 双手提包和眼镜",
+    "main_image": "4356db180a18475e800788561268c1dd",
+    "references": [
+      "3081a89915c34bd891259231fdaff434",
+      "b55a78aefba34b51afee1b5dcc69882b"
+    ],
+    "mappings": [
+      {
+        "id": "8c7a543bd791479f82987f46e0a6f673",
+        "display_index": 1,
+        "color": "#8b5cf6",
+        "mode": "replace",
+        "source": {
+          "image_id": "3081a89915c34bd891259231fdaff434",
+          "image_version": 1,
+          "mask_id": "e64c049f6b7f4e379f08d66198ec3195",
+          "anchor": {
+            "x": 0.5,
+            "y": 0.5
+          },
+          "label": "黑色绗缝金链包",
+          "label_source": "user"
+        },
+        "target": {
+          "image_id": "4356db180a18475e800788561268c1dd",
+          "image_version": 1,
+          "mask_id": "0a5d34d9456f4e34ad48b08ec40d5d43",
+          "anchor": {
+            "x": 0.28,
+            "y": 0.78
+          }
+        }
+      },
+      {
+        "id": "2d696b8381e747019d47a8cc09c3f21d",
+        "display_index": 2,
+        "color": "#3b82f6",
+        "mode": "replace",
+        "source": {
+          "image_id": "3081a89915c34bd891259231fdaff434",
+          "image_version": 1,
+          "mask_id": "e64c049f6b7f4e379f08d66198ec3195",
+          "anchor": {
+            "x": 0.5,
+            "y": 0.5
+          },
+          "label": "黑色绗缝金链包",
+          "label_source": "user"
+        },
+        "target": {
+          "image_id": "4356db180a18475e800788561268c1dd",
+          "image_version": 1,
+          "mask_id": "cff3c2060bf546289e0ba3bf92e01040",
+          "anchor": {
+            "x": 0.9,
+            "y": 0.85
+          }
+        }
+      },
+      {
+        "id": "f0a5a563d6b246289ff1d74b4b6cafb2",
+        "display_index": 3,
+        "color": "#f59e0b",
+        "mode": "replace",
+        "source": {
+          "image_id": "b55a78aefba34b51afee1b5dcc69882b",
+          "image_version": 1,
+          "mask_id": "f24c7adab8a64c318174324f3e59da86",
+          "anchor": {
+            "x": 0.465,
+            "y": 0.229
+          },
+          "label": "猫眼太阳镜",
+          "label_source": "user"
+        },
+        "target": {
+          "image_id": "4356db180a18475e800788561268c1dd",
+          "image_version": 1,
+          "mask_id": "55d51a6c876e47b299bc8ec7df114f83",
+          "anchor": {
+            "x": 0.58,
+            "y": 0.34
+          }
+        }
+      }
+    ],
+    "next_display_index": 4,
+    "instructions": "",
+    "id": "635537bf67ef4a059f46c93202003a0b",
+    "project_id": "0105902d643f4f74bba9d3ef492e506b",
+    "revision": 0
+  },
+  "09-occluded-coat": {
+    "schema_version": 2,
+    "name": "09 难例 · 围巾鸽子遮挡的大衣",
+    "main_image": "b55a78aefba34b51afee1b5dcc69882b",
+    "references": [
+      "4356db180a18475e800788561268c1dd"
+    ],
+    "mappings": [
+      {
+        "id": "153f7883e57640b1ac200e9ab6b36846",
+        "display_index": 1,
+        "color": "#8b5cf6",
+        "mode": "replace",
+        "source": {
+          "image_id": "4356db180a18475e800788561268c1dd",
+          "image_version": 1,
+          "mask_id": "677ab53961a74b5f94e25ab43e73dfa6",
+          "anchor": {
+            "x": 0.45,
+            "y": 0.63
+          },
+          "label": "酒红大衣",
+          "label_source": "user"
+        },
+        "target": {
+          "image_id": "b55a78aefba34b51afee1b5dcc69882b",
+          "image_version": 1,
+          "mask_id": "23374d90d62b497f80099cdd7d80984c",
+          "anchor": {
+            "x": 0.35,
+            "y": 0.373
+          }
+        }
+      }
+    ],
+    "next_display_index": 2,
+    "instructions": "",
+    "id": "66eff04f18c14ac39701b4dfac4497e9",
+    "project_id": "fc8c8dac4d8e4c42bf2281b66155b6f7",
+    "revision": 0
+  },
+  "10-held-bag": {
+    "schema_version": 2,
+    "name": "10 难例 · 手套与提包遮挡",
+    "main_image": "4356db180a18475e800788561268c1dd",
+    "references": [
+      "3081a89915c34bd891259231fdaff434"
+    ],
+    "mappings": [
+      {
+        "id": "e9b5258592f9488f9a7af0f026f4fa4c",
+        "display_index": 1,
+        "color": "#8b5cf6",
+        "mode": "replace",
+        "source": {
+          "image_id": "3081a89915c34bd891259231fdaff434",
+          "image_version": 1,
+          "mask_id": "e64c049f6b7f4e379f08d66198ec3195",
+          "anchor": {
+            "x": 0.5,
+            "y": 0.5
+          },
+          "label": "黑色绗缝金链包",
+          "label_source": "user"
+        },
+        "target": {
+          "image_id": "4356db180a18475e800788561268c1dd",
+          "image_version": 1,
+          "mask_id": "0a5d34d9456f4e34ad48b08ec40d5d43",
+          "anchor": {
+            "x": 0.28,
+            "y": 0.78
+          }
+        }
+      }
+    ],
+    "next_display_index": 2,
+    "instructions": "",
+    "id": "f13c9ade193a4d52ab7302dde4d690ee",
+    "project_id": "3a66db7718044f89ba543c4b485f271c",
+    "revision": 0
+  }
+}
