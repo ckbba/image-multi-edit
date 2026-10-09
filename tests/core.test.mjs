@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {imageRect,toImage,createMapping,addMapping,UndoStack,LatestRequest,COLORS,normalizeEditorState,composerEntries,confirmRequirement,cancelRequirementDraft} from '../前端代码/core.js';
+import {imageRect,toImage,createMapping,addMapping,UndoStack,LatestRequest,COLORS,normalizeEditorState,composerEntries,confirmRequirement,cancelRequirementDraft,composerFragmentText,applyComposerFragment} from '../前端代码/core.js';
 
 test('letterbox coordinates remain stable across viewport sizes; margins reject points',()=>{
  for(const [w,h] of [[500,400],[200,700],[1200,500]]){const r=imageRect(w,h,1200,800);const p=toImage(r.x+r.width*.25,r.y+r.height*.75,r);assert.ok(Math.abs(p.x-.25)<1e-10);assert.ok(Math.abs(p.y-.75)<1e-10);assert.equal(toImage(r.x-1,r.y,r),null);}
@@ -27,4 +27,15 @@ test('bubble confirmation replaces shared requirement and cancellation preserves
  assert.equal(cancelRequirementDraft(state,'m1','未确认').mappings[0].requirement,'旧要求');
  assert.equal(confirmRequirement(state,'m1','新要求').mappings[0].requirement,'新要求');
  assert.equal(confirmRequirement(confirmRequirement(state,'m1','一次'),'m1','二次').mappings.length,1);
+});
+
+test('unified composer fragments update the same state fields without flattening bindings',()=>{
+ const state=normalizeEditorState({instructions:'保留自然光',mappings:[{id:'m1',display_index:1,source:{},requirement:'换成坐姿'}],full_image_refs:[{id:'r1',image_id:'a',purpose:'参考街景'}]});
+ assert.equal(composerFragmentText(state,'mapping','m1'),'换成坐姿');
+ assert.equal(composerFragmentText(state,'full-image','r1'),'参考街景');
+ assert.equal(composerFragmentText(state,'global','global'),'保留自然光');
+ const changed=applyComposerFragment(state,'mapping','m1','已有句子中改写动作');
+ assert.equal(changed.mappings[0].requirement,'已有句子中改写动作');
+ assert.equal(changed.full_image_refs[0].purpose,'参考街景');
+ assert.equal(changed.instructions,'保留自然光');
 });

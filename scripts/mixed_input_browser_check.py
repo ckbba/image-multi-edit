@@ -30,23 +30,27 @@ try:
         # Create fixtures via authenticated API, avoiding native upload dialogs.
         from PIL import Image
         import io
-        def png(color):
-            b=io.BytesIO();Image.new('RGB',(240,180),color).save(b,'PNG');return b.getvalue()
+        def sample(name): return (ROOT/'evidence'/'samples'/name).read_bytes()
         ctx=page.context.request
-        main=ctx.post('http://127.0.0.1:8790/api/assets',multipart={'file':{'name':'main.png','mimeType':'image/png','buffer':png('navy')}}).json()
-        ref=ctx.post('http://127.0.0.1:8790/api/assets',multipart={'file':{'name':'ref.png','mimeType':'image/png','buffer':png('orange')}}).json()
+        main=ctx.post('http://127.0.0.1:8790/api/assets',multipart={'file':{'name':'fashion-a.png','mimeType':'image/png','buffer':sample('fashion-a.png')}}).json()
+        ref=ctx.post('http://127.0.0.1:8790/api/assets',multipart={'file':{'name':'fashion-b.png','mimeType':'image/png','buffer':sample('fashion-b.png')}}).json()
+        ref2=ctx.post('http://127.0.0.1:8790/api/assets',multipart={'file':{'name':'bag.png','mimeType':'image/png','buffer':sample('bag.png')}}).json()
+        ref3=ctx.post('http://127.0.0.1:8790/api/assets',multipart={'file':{'name':'shoes.png','mimeType':'image/png','buffer':sample('shoes.png')}}).json()
         main_mask=ctx.post('http://127.0.0.1:8790/api/masks',data={'image_id':main['id'],'points':[[.2,.2],[.7,.2],[.7,.8],[.2,.8]]}).json()
         ref_mask=ctx.post('http://127.0.0.1:8790/api/masks',data={'image_id':ref['id'],'points':[[.2,.2],[.7,.2],[.7,.8],[.2,.8]]}).json()
         mapping={'id':'browser-mapping','display_index':1,'color':'#8b5cf6','mode':'replace','requirement':'已确认旧要求','source':{'image_id':ref['id'],'image_version':1,'mask_id':ref_mask['id'],'anchor':{'x':.3,'y':.3},'label':'橙色外套'},'target':{'image_id':main['id'],'image_version':1,'mask_id':main_mask['id'],'edit_region_id':main_mask['id'],'anchor':{'x':.4,'y':.4}}}
-        draft=ctx.post('http://127.0.0.1:8790/api/drafts').json();draft.update({'name':'混用浏览器验证','main_image':main['id'],'references':[ref['id']],'mappings':[mapping],'next_display_index':2,'full_image_refs':[],'instructions':'自然光'})
+        draft=ctx.post('http://127.0.0.1:8790/api/drafts').json();draft.update({'name':'混用浏览器验证','main_image':main['id'],'references':[ref['id'],ref2['id'],ref3['id']],'mappings':[mapping],'next_display_index':2,'full_image_refs':[],'instructions':'自然光'})
         saved=ctx.put('http://127.0.0.1:8790/api/drafts/'+draft['id'],data=draft);assert saved.ok
-        page.reload();expect(page.locator('#main-canvas')).to_be_visible();expect(page.locator('#filmstrip img')).to_have_count(1);expect(page.locator('.composer-entry')).to_contain_text('元素 · 1 · 橙色外套')
+        page.reload();expect(page.locator('#main-canvas')).to_be_visible();expect(page.locator('#filmstrip img')).to_have_count(3);expect(page.locator('#composer-editor')).to_have_attribute('contenteditable','true');expect(page.locator('#composer-editor textarea')).to_have_count(0);expect(page.locator('.composer-fragment.mapping')).to_contain_text('元素 1 · 橙色外套')
         # Bubble draft is discarded outside, then confirmation updates the same composer entry in place.
-        page.locator('[data-canvas-bubble="browser-mapping"]').click();page.locator('#bubble-editor textarea').fill('未确认草稿');page.locator('.workspace-heading').click();expect(page.locator('[data-requirement="browser-mapping"]')).to_have_value('已确认旧要求')
-        page.locator('[data-canvas-bubble="browser-mapping"]').click();page.locator('#bubble-editor textarea').fill('让人物坐下并穿上外套');page.locator('#bubble-editor button').click();expect(page.locator('[data-requirement="browser-mapping"]')).to_have_value('让人物坐下并穿上外套');expect(page.locator('.composer-entry:not(.whole)')).to_have_count(1)
-        page.locator('#mention').click();expect(page.locator('#mention-menu')).to_be_visible();expect(page.locator('#mention-menu')).to_contain_text('完整参考图');expect(page.locator('#mention-menu')).to_contain_text('已拖入主图的元素')
-        page.locator('[data-add-whole]').click();expect(page.locator('.composer-entry.whole')).to_be_visible();expect(page.locator('.composer-entry.whole')).to_contain_text('整图 · 参考图 1')
-        page.locator('[data-purpose]').fill('参考完整背景氛围');page.locator('[data-purpose]').blur();page.wait_for_timeout(900)
+        page.locator('[data-canvas-bubble="browser-mapping"]').click();page.locator('#bubble-editor textarea').fill('未确认草稿');page.locator('.workspace-heading').click();expect(page.locator('.composer-fragment.mapping .composer-text')).to_have_text('已确认旧要求')
+        page.locator('[data-canvas-bubble="browser-mapping"]').click();page.locator('#bubble-editor textarea').fill('让人物坐下并穿上外套');page.locator('#bubble-editor button').click();expect(page.locator('.composer-fragment.mapping .composer-text')).to_have_text('让人物坐下并穿上外套');expect(page.locator('.composer-fragment.mapping')).to_have_count(1)
+        page.locator('#mention').click();expect(page.locator('#mention-menu')).to_be_visible();expect(page.locator('#mention-menu')).to_contain_text('完整图片');expect(page.locator('#mention-menu')).to_contain_text('已拖入主图的元素')
+        expect(page.locator('[data-add-whole]')).to_have_count(4)
+        print('MENTION_HANDLER',page.locator('[data-add-whole]').nth(1).evaluate('(e)=>typeof e.onclick'))
+        page.locator('[data-add-whole]').nth(1).locator('span').click();print('COMPOSER_HTML',page.locator('#composer-editor').inner_html());expect(page.locator('.composer-fragment.full-image')).to_be_visible();expect(page.locator('.composer-fragment.full-image')).to_contain_text('整图 · 参考图 1')
+        page.locator('.composer-fragment.full-image .composer-text').click();page.keyboard.type('参考完整背景氛围');page.locator('.workspace-heading').click();page.wait_for_timeout(900)
+        page.locator('#composer-assets .asset-stack').hover();expanded=page.locator('#composer-assets [data-asset-menu]').evaluate_all('(els)=>els.map(e=>e.getBoundingClientRect().left)');assert len(set(round(x) for x in expanded))==4
         expect(page.locator('#generate')).to_be_enabled()
         page.screenshot(path=str(OUT/'mixed-composer.png'),full_page=True)
         # Submit simulation and inspect immutable historical actual inputs.
@@ -54,7 +58,7 @@ try:
         expect(page.locator('.detail-sidebar')).to_contain_text('整图 · 参考图 1');expect(page.locator('.detail-sidebar')).to_contain_text('让人物坐下并穿上外套');expect(page.locator('.detail-sidebar')).to_contain_text('实际模型输入');expect(page.locator('.detail-sidebar')).to_contain_text('元素 1 → IMAGE 2');expect(page.locator('.detail-sidebar')).to_contain_text('整图 IMAGE 3')
         page.screenshot(path=str(OUT/'mixed-history.png'),full_page=True)
         # Restore preserves binding; result continuation is backend-covered because simulation has no result bytes.
-        page.locator('#restore').click();expect(page.locator('.composer-entry.whole')).to_contain_text('整图 · 参考图 1')
+        page.locator('#restore').click();expect(page.locator('.composer-fragment.full-image')).to_contain_text('整图 · 参考图 1')
         page.screenshot(path=str(OUT/'mixed-restored.png'),full_page=True)
         result={'checks':['single rich composer visible','bubble outside-click discards draft','bubble confirmation replaces shared composer entry without duplication','whole-image @ menu uses existing references','same source element crop and whole image submit together','history shows immutable requirements and actual input indexes','restore returns bindings'],'console_errors':[e for e in errors if '401 (Unauthorized)' not in e],'expected_prelogin_401':any('401 (Unauthorized)' in e for e in errors),'job_posts':[u for u in writes if u.endswith('/api/jobs')],'screenshots':['mixed-composer.png','mixed-history.png','mixed-restored.png']}
         (OUT/'browser-check.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
