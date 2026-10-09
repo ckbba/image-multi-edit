@@ -251,7 +251,7 @@ def history(status: str = 'all', offset: int = 0):
     for row in rows:
         item = public_job(store.job(row['id']))
         state = item['snapshot']['state']
-        result.append({k: item[k] for k in ('id', 'created', 'status', 'result')} | {'name': state['name'], 'main_image': state['main_image'], 'count': len(state['mappings'])})
+        result.append({k: item[k] for k in ('id', 'created', 'status', 'result')} | {'name': state['name'], 'main_image': state['main_image'], 'count': len(state.get('mappings', [])) + len(state.get('full_image_refs', []))})
     return {'items': result, 'next_offset': offset + 20 if len(result) == 20 else None}
 
 
@@ -283,6 +283,9 @@ async def restore(jid: str, request: Request):
             raise HTTPException(400, '该输出不存在')
         state['main_image'] = aid
         state['mappings'] = []
+        state['references'] = []
+        state['full_image_refs'] = []
+        state['instructions'] = ''
         state['next_display_index'] = 1
         state['origin_result_id'] = aid
         state['name'] = job['snapshot']['state']['name'] + ' · 下一轮'

@@ -135,6 +135,7 @@ COLORS = ['#8b5cf6', '#3b82f6', '#f59e0b', '#10b981', '#ec4899']
 def validate(state, for_submit=False, allow_overlap=False):
     mappings = state.get('mappings', [])
     refs = state.get('references', [])
+    whole_refs = state.get('full_image_refs', [])
     if len(refs) > 8 or len(mappings) > 5 or len(set(refs)) != len(refs):
         raise HTTPException(400, '最多 8 张不同参考图和 5 条有效编辑')
     if len(state.get('instructions', '')) > 2000 or len(state.get('name', '')) > 100:
@@ -145,6 +146,13 @@ def validate(state, for_submit=False, allow_overlap=False):
     for aid in ([main] if main else []) + refs:
         if asset(aid)['kind'] not in ('image', 'output'):
             raise HTTPException(400, '主图和参考图必须是图像素材')
+    whole_ids = set()
+    for reference in whole_refs:
+        if reference.get('id') in whole_ids or reference.get('image_id') not in refs:
+            raise HTTPException(400, '整图引用重复或指向失效素材')
+        whole_ids.add(reference.get('id'))
+        if len(reference.get('label', '')) > 80 or len(reference.get('purpose', '')) > 1000:
+            raise HTTPException(400, '整图引用名称或用途过长')
     ids, numbers = set(), set()
     masks = []
     for mapping in mappings:
@@ -156,6 +164,8 @@ def validate(state, for_submit=False, allow_overlap=False):
             raise HTTPException(400, '关系编号与颜色不一致')
         if len(mapping['source'].get('label', '')) > 10:
             raise HTTPException(400, '物品名称最多 10 字')
+        if len(mapping.get('requirement', '')) > 1000:
+            raise HTTPException(400, '单条操作要求最多 1000 字')
         for side in ('source', 'target'):
             data = mapping[side]
             expected = refs if side == 'source' else [main]
@@ -182,8 +192,10 @@ def validate(state, for_submit=False, allow_overlap=False):
                 conflicts.append({'a': a, 'b': b, 'overlap': round(ratio, 4), 'duplicate': ratio > 0.85})
     if state.get('next_display_index', 1) <= max(numbers, default=0):
         raise HTTPException(400, '下个编号必须大于已分配编号')
-    if for_submit and (not main or not mappings):
-        raise HTTPException(400, '请准备主图和至少一条有效编辑关系')
+    if for_submit and (not main or (not mappings and not whole_refs)):
+        raise HTTPException(400, '请准备主图和至少一条有效编辑关系或整图引用')
+    if for_submit and not mappings and whole_refs and not (state.get('instructions', '').strip() or any(r.get('purpose', '').strip() for r in whole_refs)):
+        raise HTTPException(400, '仅整图引用时请填写明确要求')
     if for_submit and conflicts and not allow_overlap:
         raise HTTPException(409, {'code': 'target_overlap_confirmation_required',
             'message': '目标选区存在重叠，确认可能影响效果后仍可生成', 'conflicts': conflicts})
@@ -191,13 +203,15 @@ def validate(state, for_submit=False, allow_overlap=False):
 
 
 def new_draft(state=None):
-    state = json.loads(json.dumps(state)) if state else dict(schema_version=2, name='未命名编辑', main_image=None,
-        references=[], mappings=[], next_display_index=1, instructions='')
+    state = json.loads(json.dumps(state)) if state else dict(schema_version=3, name='未命名编辑', main_image=None,
+        references=[], mappings=[], full_image_refs=[], next_display_index=1, instructions='')
     state['id'] = uid()
     state['project_id'] = state.get('project_id', uid())
     state['revision'] = 0
-    state['schema_version'] = 2
+    state['schema_version'] = 3
     state.setdefault('references', [])
+    state.setdefault('full_image_refs', [])
+    state.setdefault('instructions', '')
     state.setdefault('next_display_index', max([m['display_index'] for m in state.get('mappings', [])], default=0) + 1)
     with db() as con:
         con.execute('INSERT INTO drafts VALUES(?,?,?,?)', (state['id'], 0, time.time(), json.dumps(state)))

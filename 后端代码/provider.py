@@ -46,8 +46,8 @@ def compile_request(state, strategy=None):
         raise ValueError('Unknown source strategy')
     inputs = [state['main_image']]
     bindings = []
-    lines = ['Edit IMAGE 1 as the base photograph. Perform all replacements listed below in ONE final photograph.',
-             'Preserve the base camera framing, aspect ratio, identity, pose, background and everything outside the selected targets.',
+    lines = ['Edit IMAGE 1 as the base photograph. Perform all user-directed edits listed below in ONE final photograph.',
+             'Preserve unrelated content unless a user requirement explicitly asks to change it.',
              'Each source belongs ONLY to its listed operation. Adapt source objects naturally to target perspective, lighting and occlusion.',
              'Coordinates below are normalized [0,1] regions in the original images, not API control parameters.',
              'Do not reproduce masks, labels, guide outlines or numbered markings in the final image.']
@@ -70,18 +70,25 @@ def compile_request(state, strategy=None):
         inputs.append(source_id)
         index = len(inputs)
         target_bbox = store.asset(tgt['mask_id'])['bbox']
+        action = m.get('requirement', '').strip()
         lines.append(f'Operation {m["display_index"]}: use the selected object {src.get("label", "")} from IMAGE {index}, '
                      f'source region {bbox if strategy == "full" else "the central selected object in the crop"}, '
-                     f'to REPLACE the object in IMAGE 1 target region {target_bbox}, '
+                     f'for the edit around IMAGE 1 target region {target_bbox}, '
                      f'with intended location near normalized point ({tgt["anchor"]["x"]}, {tgt["anchor"]["y"]}). '
-                     'Keep the source product color, design, pattern and details. Do not copy the source background.')
-        bindings.append({'mapping_id': m['id'], 'display_index': m['display_index'], 'input_index': index,
+                     + (f'User requirement: {action}. ' if action else 'Default intent: replace the selected target object with the source object. ')
+                     + 'Do not copy the source background unless explicitly requested.')
+        bindings.append({'kind':'element','mapping_id': m['id'], 'display_index': m['display_index'], 'input_index': index,
                          'original_id': src['image_id'], 'input_asset_id': source_id, 'crop': derived, 'target_bbox': target_bbox,
                          'target_anchor': dict(tgt['anchor'])})
+    for reference in state.get('full_image_refs', []):
+        inputs.append(reference['image_id']);index=len(inputs)
+        purpose=reference.get('purpose', '').strip() or 'use as an overall visual reference'
+        lines.append(f'Whole-image reference IMAGE {index} ({reference.get("label", "reference")}): {purpose}. This is a complete-image reference, distinct from any cropped element input from the same source.')
+        bindings.append({'kind':'full-image','reference_id':reference['id'],'input_index':index,'original_id':reference['image_id'],'purpose':purpose})
     if state.get('instructions'):
         lines.append('Additional user requirements: ' + state['instructions'])
     return dict(prompt='\n'.join(lines), inputs=inputs, bindings=bindings, strategy=strategy,
-                compiler_version='mapping-text-v2', model=config.MODEL, mask_mode='disabled-unverified',
+                compiler_version='mixed-input-v3', model=config.MODEL, mask_mode='disabled-unverified',
                 quality=os.getenv('IMAGE25_QUALITY') or None, size='auto', execution='batch-experimental')
 
 

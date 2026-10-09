@@ -221,3 +221,54 @@ def test_overlapping_targets_keep_distinct_anchor_intent(client):
     assert compiled['bindings'][0]['target_anchor']=={'x':.2,'y':.2}
     assert compiled['bindings'][1]['target_anchor']=={'x':.25,'y':.25}
     assert '(0.2, 0.2)' in compiled['prompt'] and '(0.25, 0.25)' in compiled['prompt']
+
+
+def test_mixed_whole_image_and_element_compile_as_distinct_inputs(client):
+    state=ready(client)
+    source=state['mappings'][0]['source']['image_id']
+    state['mappings'][0]['requirement']='把人物改成坐姿并穿上这件衣服'
+    state['full_image_refs']=[{'id':'whole-1','image_id':source,'label':'街景','purpose':'仅参考整图背景'}]
+    compiled=provider.compile_request(state,'context-crop')
+    assert len(compiled['inputs'])==3
+    assert compiled['inputs'][2]==source
+    assert compiled['bindings'][0]['kind']=='element'
+    assert compiled['bindings'][1]['kind']=='full-image'
+    assert compiled['bindings'][0]['original_id']==compiled['bindings'][1]['original_id']==source
+    assert compiled['bindings'][0]['input_asset_id']!=compiled['bindings'][1]['original_id']
+    assert '坐姿并穿上' in compiled['prompt']
+    assert '仅参考整图背景' in compiled['prompt']
+    assert 'Preserve the base camera framing, aspect ratio, identity, pose' not in compiled['prompt']
+
+
+def test_unmentioned_uploaded_reference_is_not_input_but_explicit_whole_image_is(client):
+    state=ready(client);unused=upload(client,'yellow');state['references'].append(unused['id'])
+    first=provider.compile_request(state,'context-crop')
+    assert unused['id'] not in first['inputs']
+    state['full_image_refs']=[{'id':'whole-2','image_id':unused['id'],'label':'黄色图','purpose':'参考整体色调'}]
+    second=provider.compile_request(state,'context-crop')
+    assert unused['id'] in second['inputs']
+
+
+def test_whole_image_only_submission_and_snapshot_restore(client):
+    main,ref=upload(client),upload(client,'red')
+    state=client.post('/api/drafts').json()
+    state.update(main_image=main['id'],references=[ref['id']],instructions='让画面更自然',
+        full_image_refs=[{'id':'whole-only','image_id':ref['id'],'label':'参考图 1','purpose':'参考背景氛围'}])
+    saved=client.put('/api/drafts/'+state['id'],json=state);assert saved.status_code==200,saved.text
+    state['revision']=saved.json()['revision'];job=submit(client,state,'whole-only-submit')
+    assert job['snapshot']['state']['full_image_refs'][0]['id']=='whole-only'
+    restored=client.post('/api/jobs/'+job['id']+'/restore',json={}).json()
+    assert restored['full_image_refs']==state['full_image_refs']
+    assert client.get('/api/jobs/'+job['id']).json()['snapshot']['state']['full_image_refs']==state['full_image_refs']
+
+
+def test_continue_from_result_clears_old_regions_and_references(client,monkeypatch):
+    state=ready(client);state['mappings'][0]['requirement']='旧图局部要求';state['full_image_refs']=[{'id':'whole','image_id':state['references'][0],'label':'整图','purpose':'背景'}]
+    # A simulated job has no output, so attach an immutable local output to exercise continuation.
+    job=submit(client,state,'continue-mixed');out=upload(client,'green')['id']
+    with store.db() as con:
+        con.execute('UPDATE jobs SET result=? WHERE id=?',(json.dumps({'assets':[out],'calls':0}),job['id']))
+    continued=client.post('/api/jobs/'+job['id']+'/restore',json={'use_result':True,'asset_id':out}).json()
+    assert continued['main_image']==out and continued['mappings']==[]
+    assert continued['full_image_refs']==[] and continued['references']==[]
+    assert continued['instructions']=='' and continued['next_display_index']==1

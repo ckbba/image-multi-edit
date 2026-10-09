@@ -5,7 +5,7 @@ export function openPreview(items, initial=0, marked=false, options={}){
   dialog.setAttribute('aria-label','图片预览');
   dialog.innerHTML=`<header class="viewer-head"><strong id="viewer-title"></strong><div class="viewer-tools"><button id="viewer-out" aria-label="缩小图片">−</button><output id="viewer-scale"></output><button id="viewer-in" aria-label="放大图片">＋</button><button id="viewer-fit">适应窗口</button><button id="viewer-close">关闭 ×</button></div></header><div class="viewer-options"><label><input id="viewer-regions" type="checkbox">显示当时编辑区域</label><span id="viewer-note"></span></div><div class="viewer-stage"><canvas aria-label="放大图片画布"></canvas><p class="viewer-loading" role="status">正在加载原图…</p></div><nav class="viewer-gallery" aria-label="切换预览图片"></nav><footer class="viewer-foot">滚轮缩放 · 按住图片拖动 · Esc 关闭</footer>`;
   const find=s=>dialog.querySelector(s),stage=find('.viewer-stage'),canvas=find('canvas'),ctx=canvas.getContext('2d');
-  let index=initial,im=null,regions=[],version=0,scale=1,x=0,y=0,panning=null;
+  let index=initial,im=null,regions=[],version=0,scale=1,x=0,y=0,panning=null,regionDrag=null;
   const cache=new Map();
   function load(id){if(!cache.has(id))cache.set(id,new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=()=>reject(new Error('图片加载失败，请关闭后重试'));image.src='/api/assets/'+id;}));return cache.get(id);}
   function transform(){
@@ -53,9 +53,9 @@ export function openPreview(items, initial=0, marked=false, options={}){
   find('#viewer-regions').checked=marked;find('#viewer-regions').onchange=paint;
   find('#viewer-in').onclick=()=>zoom(1.25);find('#viewer-out').onclick=()=>zoom(.8);find('#viewer-fit').onclick=fit;find('#viewer-close').onclick=()=>dialog.close();
   stage.addEventListener('wheel',event=>{event.preventDefault();const box=stage.getBoundingClientRect(),delta=event.deltaY*(event.deltaMode===1?16:event.deltaMode===2?stage.clientHeight:1);zoom(Math.exp(-Math.max(-300,Math.min(300,delta))*.002),event.clientX-box.left,event.clientY-box.top);},{passive:false});
-  stage.onpointerdown=event=>{if(event.button!==0||!im)return;event.preventDefault();panning={px:event.clientX,py:event.clientY,x,y};stage.setPointerCapture(event.pointerId);stage.classList.add('panning');};
-  stage.onpointermove=event=>{if(!panning)return;x=panning.x+event.clientX-panning.px;y=panning.y+event.clientY-panning.py;transform();};
-  stage.onpointerup=stage.onpointercancel=()=>{panning=null;stage.classList.remove('panning');};
+  stage.onpointerdown=event=>{if(event.button!==0||!im)return;event.preventDefault();const box=stage.getBoundingClientRect(),ix=(event.clientX-box.left-x)/scale/im.width,iy=(event.clientY-box.top-y)/scale/im.height,region=options.onRegionDrop&&regions.find(r=>Math.hypot(ix-r.anchor.x,iy-r.anchor.y)<.07);if(region){regionDrag={region,sx:event.clientX,sy:event.clientY,moved:false};stage.setPointerCapture(event.pointerId);return;}panning={px:event.clientX,py:event.clientY,x,y};stage.setPointerCapture(event.pointerId);stage.classList.add('panning');};
+  stage.onpointermove=event=>{if(regionDrag){if(Math.hypot(event.clientX-regionDrag.sx,event.clientY-regionDrag.sy)>6){regionDrag.moved=true;dialog.classList.add('drag-fading');}return;}if(!panning)return;x=panning.x+event.clientX-panning.px;y=panning.y+event.clientY-panning.py;transform();};
+  stage.onpointerup=event=>{if(regionDrag){const active=regionDrag;regionDrag=null;dialog.classList.remove('drag-fading');if(active.moved){dialog.close();options.onRegionDrop(active.region,event.clientX,event.clientY);}return;}panning=null;stage.classList.remove('panning');};stage.onpointercancel=()=>{regionDrag=null;dialog.classList.remove('drag-fading');panning=null;stage.classList.remove('panning');};
   const resize=new ResizeObserver(fit);
   if(options.minimal){
     dialog.classList.add('minimal-viewer');
@@ -78,6 +78,7 @@ export function openPreview(items, initial=0, marked=false, options={}){
     dialog.addEventListener('cancel',event=>{if(points){event.preventDefault();points=null;pointerId=null;paint();status.textContent='已取消本次圈画';}});
   }
   const previousFocus=document.activeElement;
+  dialog.addEventListener('pointerdown',event=>{if(event.target===dialog)dialog.close();});
   dialog.addEventListener('close',()=>{version++;resize.disconnect();options.onClose?.();dialog.remove();if(previousFocus?.isConnected)previousFocus.focus();},{once:true});
   document.body.append(dialog);dialog.showModal();resize.observe(stage);select(initial);
 }
