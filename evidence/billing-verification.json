@@ -1,0 +1,42 @@
+[
+  {
+    "path": "/v1/tasks/b399abe3-6d80-43ba-9a83-e0e5f1b230f3",
+    "http_status": 404,
+    "fields": [
+      "error"
+    ],
+    "cost_usd": null,
+    "image25_model_stats": []
+  },
+  {
+    "path": "/v1/usage",
+    "http_status": 200,
+    "fields": [
+      "account_balance",
+      "balance",
+      "daily_stats",
+      "isValid",
+      "key_quota",
+      "key_remaining",
+      "key_used",
+      "mode",
+      "model_stats",
+      "planName",
+      "remaining",
+      "unit",
+      "usage"
+    ],
+    "cost_usd": null,
+    "image25_model_stats": [
+      {
+        "actual_cost": 6.498,
+        "cost": 6.498,
+        "input_tokens": 173658,
+        "model": "gpt-image-2.5-flare",
+        "output_tokens": 135795,
+        "requests": 171,
+        "total_tokens": 309453
+      }
+    ]
+  }
+]

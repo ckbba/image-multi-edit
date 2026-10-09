@@ -1,0 +1,120 @@
+{
+  "hardware": "Quadro T2000 Max-Q / Windows / localhost",
+  "image_size": [
+    1024,
+    684
+  ],
+  "n": 20,
+  "prepare_wall_ms": 23326.96950000536,
+  "prepare": {
+    "ready": true,
+    "elapsed_ms": 23318.26,
+    "device": "cuda:0"
+  },
+  "dwell_ms": 120,
+  "p50_ms": 280.15000000596046,
+  "p95_ms": 461.17000000849407,
+  "measurements": [
+    {
+      "visible_ms": 433.6000000089407,
+      "server_ms": 367.37,
+      "cached": false
+    },
+    {
+      "visible_ms": 985,
+      "server_ms": 939.98,
+      "cached": false
+    },
+    {
+      "visible_ms": 271.59999999403954,
+      "server_ms": 230.77,
+      "cached": false
+    },
+    {
+      "visible_ms": 276,
+      "server_ms": 228.81,
+      "cached": false
+    },
+    {
+      "visible_ms": 262.79999999701977,
+      "server_ms": 227.01,
+      "cached": false
+    },
+    {
+      "visible_ms": 280.40000000596046,
+      "server_ms": 226.51,
+      "cached": false
+    },
+    {
+      "visible_ms": 279.29999999701977,
+      "server_ms": 235.42,
+      "cached": false
+    },
+    {
+      "visible_ms": 276.29999999701977,
+      "server_ms": 221.84,
+      "cached": false
+    },
+    {
+      "visible_ms": 278.29999999701977,
+      "server_ms": 234.41,
+      "cached": false
+    },
+    {
+      "visible_ms": 279.70000000298023,
+      "server_ms": 240.88,
+      "cached": false
+    },
+    {
+      "visible_ms": 278.3999999910593,
+      "server_ms": 240.58,
+      "cached": false
+    },
+    {
+      "visible_ms": 297.1000000089407,
+      "server_ms": 245.09,
+      "cached": false
+    },
+    {
+      "visible_ms": 296.40000000596046,
+      "server_ms": 248.57,
+      "cached": false
+    },
+    {
+      "visible_ms": 303.5,
+      "server_ms": 250.41,
+      "cached": false
+    },
+    {
+      "visible_ms": 279.90000000596046,
+      "server_ms": 237.05,
+      "cached": false
+    },
+    {
+      "visible_ms": 278.5,
+      "server_ms": 238.06,
+      "cached": false
+    },
+    {
+      "visible_ms": 296.40000000596046,
+      "server_ms": 251.26,
+      "cached": false
+    },
+    {
+      "visible_ms": 297.20000000298023,
+      "server_ms": 247.65,
+      "cached": false
+    },
+    {
+      "visible_ms": 280.5,
+      "server_ms": 230.23,
+      "cached": false
+    },
+    {
+      "visible_ms": 311.90000000596046,
+      "server_ms": 258.31,
+      "cached": false
+    }
+  ],
+  "note": "Browser transport/decode/paint harness; main editor first-hover measurement in output/playwright/browser-check.json. Dwell reported separately; add 120ms for pause-to-visible total."
+}

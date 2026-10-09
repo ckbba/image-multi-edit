@@ -1,0 +1,12 @@
+.env
+LOCAL_ACCESS.md
+.playwright-cli/
+scripts/browser_login.private.js
+PRD及文档/image2.5-flare-sunburst-渠道接入说明.md
+data/
+.models/
+__pycache__/
+.pytest_cache/
+.venv/
+output/
+*.log

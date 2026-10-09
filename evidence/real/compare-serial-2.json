@@ -1,0 +1,99 @@
+{
+  "name": "compare-serial-2",
+  "state": {
+    "schema_version": 2,
+    "name": "04 两对象 · 包和鞋",
+    "main_image": "9c3a42d9296c45d9a6ea3749602f7db5",
+    "references": [
+      "3081a89915c34bd891259231fdaff434",
+      "34efd17be0494c6698fb120157eaab3d"
+    ],
+    "mappings": [
+      {
+        "id": "6a7fde17f7d743c0a855502dc80cb0ef",
+        "display_index": 2,
+        "color": "#3b82f6",
+        "mode": "replace",
+        "source": {
+          "image_id": "34efd17be0494c6698fb120157eaab3d",
+          "image_version": 1,
+          "mask_id": "dadfa976fe704337872200b9bc1b8f31",
+          "anchor": {
+            "x": 0.53,
+            "y": 0.5
+          },
+          "label": "红色运动鞋",
+          "label_source": "user"
+        },
+        "target": {
+          "image_id": "b55a78aefba34b51afee1b5dcc69882b",
+          "image_version": 1,
+          "mask_id": "5cef8f4d0642445a8ee7bbe88eae3213",
+          "anchor": {
+            "x": 0.43,
+            "y": 0.89
+          }
+        }
+      }
+    ],
+    "next_display_index": 3,
+    "instructions": "",
+    "id": "f8e708e5664a42ef8f7fa939d432310c",
+    "project_id": "279f980b40314e8eb67ef4a7582cd23a",
+    "revision": 0
+  },
+  "compiled": {
+    "prompt": "Edit IMAGE 1 as the base photograph. Perform all replacements listed below in ONE final photograph.\nPreserve the base camera framing, aspect ratio, identity, pose, background and everything outside the selected targets.\nEach source belongs ONLY to its listed operation. Adapt source objects naturally to target perspective, lighting and occlusion.\nCoordinates below are normalized [0,1] regions in the original images, not API control parameters.\nDo not reproduce masks, labels, guide outlines or numbered markings in the final image.\nOperation 2: use the selected object 红色运动鞋 from IMAGE 2, source region [0.189453125, 0.014641288433382138, 0.830078125, 0.890190336749634], to REPLACE the object in IMAGE 1 target region [0.3720703125, 0.7975260416666666, 0.7529296875, 0.9602864583333334]. Keep the source product color, design, pattern and details. Do not copy the source background.",
+    "inputs": [
+      "9c3a42d9296c45d9a6ea3749602f7db5",
+      "34efd17be0494c6698fb120157eaab3d"
+    ],
+    "bindings": [
+      {
+        "mapping_id": "6a7fde17f7d743c0a855502dc80cb0ef",
+        "display_index": 2,
+        "input_index": 2,
+        "original_id": "34efd17be0494c6698fb120157eaab3d",
+        "input_asset_id": "34efd17be0494c6698fb120157eaab3d",
+        "crop": null,
+        "target_bbox": [
+          0.3720703125,
+          0.7975260416666666,
+          0.7529296875,
+          0.9602864583333334
+        ]
+      }
+    ],
+    "strategy": "full",
+    "compiler_version": "mapping-text-v1",
+    "model": "gpt-image-2.5-flare",
+    "mask_mode": "disabled-unverified",
+    "quality": null,
+    "size": "auto",
+    "execution": "batch-experimental"
+  },
+  "mask_experiment": null,
+  "started_at": 1791422601.9621074,
+  "status": "succeeded",
+  "calls": 1,
+  "result": {
+    "outputs": [
+      {
+        "generation_id": "f45d6500-043b-452e-8ab8-f31729c3e17a",
+        "mime_type": "image/png",
+        "size_bytes": 2325688,
+        "url": "https://task-cdn2.65535.space/?url=https%3A%2F%2Ftask1.65535.space%2Fjobs%2Fimg_8e94e4a474ac24c3c72e35bfd12770a5%2F0.png"
+      }
+    ],
+    "elapsed_s": 36.266,
+    "request_id": "55890931-bfe8-46f2-8241-57dca5469849",
+    "usage": null,
+    "cost_usd": null,
+    "calls": 1,
+    "assets": [
+      "94fa0a24b24c48a0bbfc30c4a515ed20"
+    ]
+  },
+  "history_id": "a813ec9f71db42059803247b7720cccb",
+  "wall_s": 39.485
+}

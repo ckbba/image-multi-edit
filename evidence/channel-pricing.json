@@ -1,0 +1,178 @@
+{
+  "endpoint": "pricing",
+  "status": 200,
+  "duration_s": 0.766,
+  "records": [
+    {
+      "id": "gpt-image-2.5",
+      "name": "gpt-image-2.5",
+      "mode": "usage",
+      "input_micro_per_1k": 0,
+      "output_micro_per_1k": 0,
+      "cached_micro_per_1k": 0,
+      "cache_write_micro_per_1k": 0,
+      "per_request_micro": 0,
+      "online": true,
+      "endpoints": [
+        "openai"
+      ],
+      "groups": [
+        "任务专用分组"
+      ]
+    },
+    {
+      "id": "gpt-image-2.5-flare",
+      "name": "gpt-image-2.5-flare",
+      "mode": "usage",
+      "input_micro_per_1k": 0,
+      "output_micro_per_1k": 0,
+      "cached_micro_per_1k": 0,
+      "cache_write_micro_per_1k": 0,
+      "per_request_micro": 0,
+      "online": true,
+      "description": "相较 GPT‑Image‑2 质量更高，延迟降低 50%。作为多数应用场景的默认首选，兼顾创作者内容、社媒素材、产品体验、视觉搜索、快速原型迭代及大规模批量生成。",
+      "provider": "OpenAi",
+      "supported_endpoints": [
+        "image"
+      ],
+      "tags": [
+        "image"
+      ],
+      "endpoints": [
+        "image"
+      ],
+      "groups": [
+        "任务专用分组"
+      ]
+    },
+    {
+      "id": "gpt-image-2.5-sunburst",
+      "name": "gpt-image-2.5-sunburst",
+      "mode": "usage",
+      "input_micro_per_1k": 0,
+      "output_micro_per_1k": 0,
+      "cached_micro_per_1k": 0,
+      "cache_write_micro_per_1k": 0,
+      "per_request_micro": 0,
+      "online": true,
+      "description": "专为高级视觉工作流打造，在编辑环节提供更精细的控制力。适用于生产级广告创意、精修产品图等对品质和调校要求严苛的创作与编辑场景.",
+      "provider": "OpenAi",
+      "supported_endpoints": [
+        "image"
+      ],
+      "tags": [
+        "image"
+      ],
+      "endpoints": [
+        "image"
+      ],
+      "groups": [
+        "任务专用分组"
+      ]
+    },
+    {
+      "id": "gpt-image-2.5-auto",
+      "name": "gpt-image-2.5-auto",
+      "mode": "usage",
+      "input_micro_per_1k": 0,
+      "output_micro_per_1k": 0,
+      "cached_micro_per_1k": 0,
+      "cache_write_micro_per_1k": 0,
+      "per_request_micro": 0,
+      "online": true,
+      "description": "对应模型的4K高清重绘版本",
+      "endpoints": [
+        "openai"
+      ],
+      "groups": [
+        "任务专用分组"
+      ]
+    },
+    {
+      "id": "gpt-image-2.5-flare-auto",
+      "name": "gpt-image-2.5-flare-auto",
+      "mode": "usage",
+      "input_micro_per_1k": 0,
+      "output_micro_per_1k": 0,
+      "cached_micro_per_1k": 0,
+      "cache_write_micro_per_1k": 0,
+      "per_request_micro": 0,
+      "online": true,
+      "description": "对应模型的4K高清重绘版本",
+      "endpoints": [
+        "openai"
+      ],
+      "groups": [
+        "任务专用分组"
+      ]
+    },
+    {
+      "id": "gpt-image-2.5-sunburst-auto",
+      "name": "gpt-image-2.5-sunburst-auto",
+      "mode": "usage",
+      "input_micro_per_1k": 0,
+      "output_micro_per_1k": 0,
+      "cached_micro_per_1k": 0,
+      "cache_write_micro_per_1k": 0,
+      "per_request_micro": 0,
+      "online": true,
+      "description": "对应模型的4K高清重绘版本",
+      "endpoints": [
+        "openai"
+      ],
+      "groups": [
+        "任务专用分组"
+      ]
+    },
+    {
+      "id": "gpt-image-2.5-flare-eco",
+      "name": "gpt-image-2.5-flare-eco",
+      "mode": "usage",
+      "input_micro_per_1k": 0,
+      "output_micro_per_1k": 0,
+      "cached_micro_per_1k": 0,
+      "cache_write_micro_per_1k": 0,
+      "per_request_micro": 0,
+      "online": true,
+      "description": "gpt-image-2.5-flare的原生4K版本，支持所有quality, 支持除n之外的官方所有参数",
+      "provider": "OpenAi",
+      "supported_endpoints": [
+        "image"
+      ],
+      "tags": [
+        "image"
+      ],
+      "endpoints": [
+        "image"
+      ],
+      "groups": [
+        "任务专用分组"
+      ]
+    },
+    {
+      "id": "gpt-image-2.5-sunburst-eco",
+      "name": "gpt-image-2.5-sunburst-eco",
+      "mode": "usage",
+      "input_micro_per_1k": 0,
+      "output_micro_per_1k": 0,
+      "cached_micro_per_1k": 0,
+      "cache_write_micro_per_1k": 0,
+      "per_request_micro": 0,
+      "online": true,
+      "description": "gpt-image-2.5-sunburst的原生4K版本，支持所有quality, 支持除n之外的官方所有参数",
+      "provider": "OpenAi",
+      "supported_endpoints": [
+        "image"
+      ],
+      "tags": [
+        "image"
+      ],
+      "endpoints": [
+        "image"
+      ],
+      "groups": [
+        "任务专用分组"
+      ]
+    }
+  ]
+}

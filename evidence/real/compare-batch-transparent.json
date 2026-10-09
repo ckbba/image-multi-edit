@@ -1,0 +1,188 @@
+{
+  "name": "compare-batch-transparent",
+  "state": {
+    "schema_version": 2,
+    "name": "04 两对象 · 包和鞋",
+    "main_image": "b55a78aefba34b51afee1b5dcc69882b",
+    "references": [
+      "3081a89915c34bd891259231fdaff434",
+      "34efd17be0494c6698fb120157eaab3d"
+    ],
+    "mappings": [
+      {
+        "id": "734f1aa8403e46e6b7c2d32d9e556359",
+        "display_index": 1,
+        "color": "#8b5cf6",
+        "mode": "replace",
+        "source": {
+          "image_id": "3081a89915c34bd891259231fdaff434",
+          "image_version": 1,
+          "mask_id": "e64c049f6b7f4e379f08d66198ec3195",
+          "anchor": {
+            "x": 0.5,
+            "y": 0.5
+          },
+          "label": "黑色绗缝金链包",
+          "label_source": "user"
+        },
+        "target": {
+          "image_id": "b55a78aefba34b51afee1b5dcc69882b",
+          "image_version": 1,
+          "mask_id": "0c98994920064c2eaa8d499f8c2400f0",
+          "anchor": {
+            "x": 0.41,
+            "y": 0.48
+          }
+        }
+      },
+      {
+        "id": "6a7fde17f7d743c0a855502dc80cb0ef",
+        "display_index": 2,
+        "color": "#3b82f6",
+        "mode": "replace",
+        "source": {
+          "image_id": "34efd17be0494c6698fb120157eaab3d",
+          "image_version": 1,
+          "mask_id": "dadfa976fe704337872200b9bc1b8f31",
+          "anchor": {
+            "x": 0.53,
+            "y": 0.5
+          },
+          "label": "红色运动鞋",
+          "label_source": "user"
+        },
+        "target": {
+          "image_id": "b55a78aefba34b51afee1b5dcc69882b",
+          "image_version": 1,
+          "mask_id": "5cef8f4d0642445a8ee7bbe88eae3213",
+          "anchor": {
+            "x": 0.43,
+            "y": 0.89
+          }
+        }
+      }
+    ],
+    "next_display_index": 3,
+    "instructions": "",
+    "id": "f8e708e5664a42ef8f7fa939d432310c",
+    "project_id": "279f980b40314e8eb67ef4a7582cd23a",
+    "revision": 0
+  },
+  "compiled": {
+    "prompt": "Edit IMAGE 1 as the base photograph. Perform all replacements listed below in ONE final photograph.\nPreserve the base camera framing, aspect ratio, identity, pose, background and everything outside the selected targets.\nEach source belongs ONLY to its listed operation. Adapt source objects naturally to target perspective, lighting and occlusion.\nCoordinates below are normalized [0,1] regions in the original images, not API control parameters.\nDo not reproduce masks, labels, guide outlines or numbered markings in the final image.\nOperation 1: use the selected object 黑色绗缝金链包 from IMAGE 2, source region the central selected object in the crop, to REPLACE the object in IMAGE 1 target region [0.322265625, 0.42578125, 0.515625, 0.5364583333333334]. Keep the source product color, design, pattern and details. Do not copy the source background.\nOperation 2: use the selected object 红色运动鞋 from IMAGE 3, source region the central selected object in the crop, to REPLACE the object in IMAGE 1 target region [0.3720703125, 0.7975260416666666, 0.7529296875, 0.9602864583333334]. Keep the source product color, design, pattern and details. Do not copy the source background.",
+    "inputs": [
+      "b55a78aefba34b51afee1b5dcc69882b",
+      "838842f906264224b9c828c0ca4bfe7e",
+      "156384d687ce47dfa7fc13325175baa6"
+    ],
+    "bindings": [
+      {
+        "mapping_id": "734f1aa8403e46e6b7c2d32d9e556359",
+        "display_index": 1,
+        "input_index": 2,
+        "original_id": "3081a89915c34bd891259231fdaff434",
+        "input_asset_id": "838842f906264224b9c828c0ca4bfe7e",
+        "crop": {
+          "id": "838842f906264224b9c828c0ca4bfe7e",
+          "version": 1,
+          "width": 821,
+          "height": 549,
+          "name": "source-1.png",
+          "mime": "image/png",
+          "path": "assets/838842f906264224b9c828c0ca4bfe7e.png",
+          "kind": "crop",
+          "origin": {
+            "image_id": "3081a89915c34bd891259231fdaff434",
+            "box_pixels": [
+              86,
+              64,
+              907,
+              613
+            ],
+            "margin_fraction": 0.08,
+            "strategy": "transparent",
+            "strategy_version": 1
+          },
+          "created": 1791422129.124381,
+          "sha256": "88e4c507110fd7f455a97a3e8c291e0cd09c155fcb6c4cfbb8b874de378eb049",
+          "bytes": 418455
+        },
+        "target_bbox": [
+          0.322265625,
+          0.42578125,
+          0.515625,
+          0.5364583333333334
+        ]
+      },
+      {
+        "mapping_id": "6a7fde17f7d743c0a855502dc80cb0ef",
+        "display_index": 2,
+        "input_index": 3,
+        "original_id": "34efd17be0494c6698fb120157eaab3d",
+        "input_asset_id": "156384d687ce47dfa7fc13325175baa6",
+        "crop": {
+          "id": "156384d687ce47dfa7fc13325175baa6",
+          "version": 1,
+          "width": 762,
+          "height": 656,
+          "name": "source-2.png",
+          "mime": "image/png",
+          "path": "assets/156384d687ce47dfa7fc13325175baa6.png",
+          "kind": "crop",
+          "origin": {
+            "image_id": "34efd17be0494c6698fb120157eaab3d",
+            "box_pixels": [
+              141,
+              0,
+              903,
+              656
+            ],
+            "margin_fraction": 0.08,
+            "strategy": "transparent",
+            "strategy_version": 1
+          },
+          "created": 1791422129.2608092,
+          "sha256": "5cd6e69ade9885bfab9bbc4d22f4cdaabc58dea2d8b024b3509974ac372396bd",
+          "bytes": 575820
+        },
+        "target_bbox": [
+          0.3720703125,
+          0.7975260416666666,
+          0.7529296875,
+          0.9602864583333334
+        ]
+      }
+    ],
+    "strategy": "transparent",
+    "compiler_version": "mapping-text-v1",
+    "model": "gpt-image-2.5-flare",
+    "mask_mode": "disabled-unverified",
+    "quality": null,
+    "size": "auto",
+    "execution": "batch-experimental"
+  },
+  "mask_experiment": null,
+  "started_at": 1791422129.2731044,
+  "status": "succeeded",
+  "calls": 1,
+  "result": {
+    "outputs": [
+      {
+        "generation_id": "a737cef0-351c-4153-94a5-f2f88d30ac4d",
+        "mime_type": "image/png",
+        "size_bytes": 2370607,
+        "url": "https://task-cdn2.65535.space/?url=https%3A%2F%2Ftask1.65535.space%2Fjobs%2Fimg_d0af4838a6369a0e22c74547dd1c3166%2F0.png"
+      }
+    ],
+    "elapsed_s": 60.187,
+    "request_id": "7eb2a5af-c988-4d24-bd14-3fa9596b1b15",
+    "usage": null,
+    "cost_usd": null,
+    "calls": 1,
+    "assets": [
+      "13d65934a6e942d4a4f710068ddf407e"
+    ]
+  },
+  "history_id": "447f7b06c67849f9b32104e10e0cf742",
+  "wall_s": 63.906
+}

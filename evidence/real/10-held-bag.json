@@ -1,0 +1,122 @@
+{
+  "name": "10-held-bag",
+  "state": {
+    "schema_version": 2,
+    "name": "10 难例 · 手套与提包遮挡",
+    "main_image": "4356db180a18475e800788561268c1dd",
+    "references": [
+      "3081a89915c34bd891259231fdaff434"
+    ],
+    "mappings": [
+      {
+        "id": "e9b5258592f9488f9a7af0f026f4fa4c",
+        "display_index": 1,
+        "color": "#8b5cf6",
+        "mode": "replace",
+        "source": {
+          "image_id": "3081a89915c34bd891259231fdaff434",
+          "image_version": 1,
+          "mask_id": "e64c049f6b7f4e379f08d66198ec3195",
+          "anchor": {
+            "x": 0.5,
+            "y": 0.5
+          },
+          "label": "黑色绗缝金链包",
+          "label_source": "user"
+        },
+        "target": {
+          "image_id": "4356db180a18475e800788561268c1dd",
+          "image_version": 1,
+          "mask_id": "0a5d34d9456f4e34ad48b08ec40d5d43",
+          "anchor": {
+            "x": 0.28,
+            "y": 0.78
+          }
+        }
+      }
+    ],
+    "next_display_index": 2,
+    "instructions": "",
+    "id": "f13c9ade193a4d52ab7302dde4d690ee",
+    "project_id": "3a66db7718044f89ba543c4b485f271c",
+    "revision": 0
+  },
+  "compiled": {
+    "prompt": "Edit IMAGE 1 as the base photograph. Perform all replacements listed below in ONE final photograph.\nPreserve the base camera framing, aspect ratio, identity, pose, background and everything outside the selected targets.\nEach source belongs ONLY to its listed operation. Adapt source objects naturally to target perspective, lighting and occlusion.\nCoordinates below are normalized [0,1] regions in the original images, not API control parameters.\nDo not reproduce masks, labels, guide outlines or numbered markings in the final image.\nOperation 1: use the selected object 黑色绗缝金链包 from IMAGE 2, source region the central selected object in the crop, to REPLACE the object in IMAGE 1 target region [0.080078125, 0.4787701317715959, 0.400390625, 0.9487554904831625]. Keep the source product color, design, pattern and details. Do not copy the source background.",
+    "inputs": [
+      "4356db180a18475e800788561268c1dd",
+      "ace29ae1657b4e6ea61b104fd535961b"
+    ],
+    "bindings": [
+      {
+        "mapping_id": "e9b5258592f9488f9a7af0f026f4fa4c",
+        "display_index": 1,
+        "input_index": 2,
+        "original_id": "3081a89915c34bd891259231fdaff434",
+        "input_asset_id": "ace29ae1657b4e6ea61b104fd535961b",
+        "crop": {
+          "id": "ace29ae1657b4e6ea61b104fd535961b",
+          "version": 1,
+          "width": 821,
+          "height": 549,
+          "name": "source-1.png",
+          "mime": "image/png",
+          "path": "assets/ace29ae1657b4e6ea61b104fd535961b.png",
+          "kind": "crop",
+          "origin": {
+            "image_id": "3081a89915c34bd891259231fdaff434",
+            "box_pixels": [
+              86,
+              64,
+              907,
+              613
+            ],
+            "margin_fraction": 0.08,
+            "strategy": "context-crop",
+            "strategy_version": 1
+          },
+          "created": 1791422999.1403735,
+          "sha256": "394667c6763f96f68ddb6b03a6be9e3df280c0f16c8056015c349fa08cc7f75f",
+          "bytes": 417511
+        },
+        "target_bbox": [
+          0.080078125,
+          0.4787701317715959,
+          0.400390625,
+          0.9487554904831625
+        ]
+      }
+    ],
+    "strategy": "context-crop",
+    "compiler_version": "mapping-text-v1",
+    "model": "gpt-image-2.5-flare",
+    "mask_mode": "disabled-unverified",
+    "quality": null,
+    "size": "auto",
+    "execution": "batch-experimental"
+  },
+  "mask_experiment": null,
+  "started_at": 1791422999.1514716,
+  "status": "succeeded",
+  "calls": 1,
+  "result": {
+    "outputs": [
+      {
+        "generation_id": "ee279896-b9c4-43fd-8483-1cf2dc2d71bd",
+        "mime_type": "image/png",
+        "size_bytes": 1877392,
+        "url": "https://task-cdn2.65535.space/?url=https%3A%2F%2Ftask1.65535.space%2Fjobs%2Fimg_d409f27e34dce2550b2aba9e0baa6738%2F0.png"
+      }
+    ],
+    "elapsed_s": 29.781,
+    "request_id": "e29e029d-0b3b-4ec9-a058-00c35f073767",
+    "usage": null,
+    "cost_usd": null,
+    "calls": 1,
+    "assets": [
+      "943ea5dcbe6d46c188205dc3053f8496"
+    ]
+  },
+  "history_id": "36a45ed88396497aa60b243c0502c6e3",
+  "wall_s": 33.0
+}

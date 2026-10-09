@@ -1,0 +1,188 @@
+{
+  "name": "06-two-shoes-glasses",
+  "state": {
+    "schema_version": 2,
+    "name": "06 两对象 · 鞋和眼镜",
+    "main_image": "b55a78aefba34b51afee1b5dcc69882b",
+    "references": [
+      "34efd17be0494c6698fb120157eaab3d",
+      "4356db180a18475e800788561268c1dd"
+    ],
+    "mappings": [
+      {
+        "id": "5ddca492678e4092b04f303b975bd7ba",
+        "display_index": 1,
+        "color": "#8b5cf6",
+        "mode": "replace",
+        "source": {
+          "image_id": "34efd17be0494c6698fb120157eaab3d",
+          "image_version": 1,
+          "mask_id": "dadfa976fe704337872200b9bc1b8f31",
+          "anchor": {
+            "x": 0.53,
+            "y": 0.5
+          },
+          "label": "红色运动鞋",
+          "label_source": "user"
+        },
+        "target": {
+          "image_id": "b55a78aefba34b51afee1b5dcc69882b",
+          "image_version": 1,
+          "mask_id": "5cef8f4d0642445a8ee7bbe88eae3213",
+          "anchor": {
+            "x": 0.43,
+            "y": 0.89
+          }
+        }
+      },
+      {
+        "id": "6f03e3c4f7984e3999ce54fc623a4def",
+        "display_index": 2,
+        "color": "#3b82f6",
+        "mode": "replace",
+        "source": {
+          "image_id": "4356db180a18475e800788561268c1dd",
+          "image_version": 1,
+          "mask_id": "aabe8c89da90443f8d123f68437df7c4",
+          "anchor": {
+            "x": 0.58,
+            "y": 0.34
+          },
+          "label": "黑色太阳镜",
+          "label_source": "user"
+        },
+        "target": {
+          "image_id": "b55a78aefba34b51afee1b5dcc69882b",
+          "image_version": 1,
+          "mask_id": "d61f1dc0d4d140c4a7a5f1c88a22ecb8",
+          "anchor": {
+            "x": 0.465,
+            "y": 0.229
+          }
+        }
+      }
+    ],
+    "next_display_index": 3,
+    "instructions": "",
+    "id": "f2b6ff9f9e054cec90cecac8127c9679",
+    "project_id": "75f883d7e2b8446aa4e1efbaaaa77592",
+    "revision": 0
+  },
+  "compiled": {
+    "prompt": "Edit IMAGE 1 as the base photograph. Perform all replacements listed below in ONE final photograph.\nPreserve the base camera framing, aspect ratio, identity, pose, background and everything outside the selected targets.\nEach source belongs ONLY to its listed operation. Adapt source objects naturally to target perspective, lighting and occlusion.\nCoordinates below are normalized [0,1] regions in the original images, not API control parameters.\nDo not reproduce masks, labels, guide outlines or numbered markings in the final image.\nOperation 1: use the selected object 红色运动鞋 from IMAGE 2, source region the central selected object in the crop, to REPLACE the object in IMAGE 1 target region [0.3720703125, 0.7975260416666666, 0.7529296875, 0.9602864583333334]. Keep the source product color, design, pattern and details. Do not copy the source background.\nOperation 2: use the selected object 黑色太阳镜 from IMAGE 3, source region the central selected object in the crop, to REPLACE the object in IMAGE 1 target region [0.419921875, 0.21614583333333334, 0.5166015625, 0.240234375]. Keep the source product color, design, pattern and details. Do not copy the source background.",
+    "inputs": [
+      "b55a78aefba34b51afee1b5dcc69882b",
+      "36698720e4b344f38bed2af39a851020",
+      "c358a0b166e9484ebd74265e9b76a645"
+    ],
+    "bindings": [
+      {
+        "mapping_id": "5ddca492678e4092b04f303b975bd7ba",
+        "display_index": 1,
+        "input_index": 2,
+        "original_id": "34efd17be0494c6698fb120157eaab3d",
+        "input_asset_id": "36698720e4b344f38bed2af39a851020",
+        "crop": {
+          "id": "36698720e4b344f38bed2af39a851020",
+          "version": 1,
+          "width": 762,
+          "height": 656,
+          "name": "source-1.png",
+          "mime": "image/png",
+          "path": "assets/36698720e4b344f38bed2af39a851020.png",
+          "kind": "crop",
+          "origin": {
+            "image_id": "34efd17be0494c6698fb120157eaab3d",
+            "box_pixels": [
+              141,
+              0,
+              903,
+              656
+            ],
+            "margin_fraction": 0.08,
+            "strategy": "context-crop",
+            "strategy_version": 1
+          },
+          "created": 1791422813.669465,
+          "sha256": "ebd8c9d5751b1fb7b9801caf9945e0627b32ca2ad3beac97236baeb4803c3de5",
+          "bytes": 574508
+        },
+        "target_bbox": [
+          0.3720703125,
+          0.7975260416666666,
+          0.7529296875,
+          0.9602864583333334
+        ]
+      },
+      {
+        "mapping_id": "6f03e3c4f7984e3999ce54fc623a4def",
+        "display_index": 2,
+        "input_index": 3,
+        "original_id": "4356db180a18475e800788561268c1dd",
+        "input_asset_id": "c358a0b166e9484ebd74265e9b76a645",
+        "crop": {
+          "id": "c358a0b166e9484ebd74265e9b76a645",
+          "version": 1,
+          "width": 156,
+          "height": 65,
+          "name": "source-2.png",
+          "mime": "image/png",
+          "path": "assets/c358a0b166e9484ebd74265e9b76a645.png",
+          "kind": "crop",
+          "origin": {
+            "image_id": "4356db180a18475e800788561268c1dd",
+            "box_pixels": [
+              511,
+              200,
+              667,
+              265
+            ],
+            "margin_fraction": 0.08,
+            "strategy": "context-crop",
+            "strategy_version": 1
+          },
+          "created": 1791422813.7112083,
+          "sha256": "49259229f842154ff50f2d3c370bfcf790e5f20caa3ca39dde650048d37bdd08",
+          "bytes": 22861
+        },
+        "target_bbox": [
+          0.419921875,
+          0.21614583333333334,
+          0.5166015625,
+          0.240234375
+        ]
+      }
+    ],
+    "strategy": "context-crop",
+    "compiler_version": "mapping-text-v1",
+    "model": "gpt-image-2.5-flare",
+    "mask_mode": "disabled-unverified",
+    "quality": null,
+    "size": "auto",
+    "execution": "batch-experimental"
+  },
+  "mask_experiment": null,
+  "started_at": 1791422813.721208,
+  "status": "succeeded",
+  "calls": 1,
+  "result": {
+    "outputs": [
+      {
+        "generation_id": "db6f07a2-e544-4541-9229-91c937c6c121",
+        "mime_type": "image/png",
+        "size_bytes": 2366651,
+        "url": "https://task-cdn2.65535.space/?url=https%3A%2F%2Ftask1.65535.space%2Fjobs%2Fimg_b2f8ea95f2427cbf30f9403bf5f9d298%2F0.png"
+      }
+    ],
+    "elapsed_s": 33.203,
+    "request_id": "835d8a95-9d15-499e-abcb-52a06d78971e",
+    "usage": null,
+    "cost_usd": null,
+    "calls": 1,
+    "assets": [
+      "ef3199e981b847ef826081d555059f9d"
+    ]
+  },
+  "history_id": "9da466b5c0dc4e9381f1da5d36ddb664",
+  "wall_s": 36.782
+}

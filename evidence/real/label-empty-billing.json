@@ -1,0 +1,29 @@
+{
+  "before": {
+    "unit": "USD",
+    "stat": {
+      "actual_cost": 6.612,
+      "cost": 6.612,
+      "input_tokens": 180343,
+      "model": "gpt-image-2.5-flare",
+      "output_tokens": 137853,
+      "requests": 174,
+      "total_tokens": 318196
+    }
+  },
+  "after": {
+    "unit": "USD",
+    "stat": {
+      "actual_cost": 6.65,
+      "cost": 6.65,
+      "input_tokens": 182793,
+      "model": "gpt-image-2.5-flare",
+      "output_tokens": 139225,
+      "requests": 175,
+      "total_tokens": 322018
+    }
+  },
+  "requests_delta": 1,
+  "cost_delta": 0.038,
+  "attribution": "Account model aggregate delta around one test, not a per-request invoice. External concurrent usage cannot be ruled out."
+}
