@@ -20,6 +20,13 @@ def uid():
     return uuid.uuid4().hex
 
 
+def idempotency_scope(user_key, mode, model, compiler_version):
+    """Separate simulation/live/compiler semantics without rewriting old rows."""
+    payload = json.dumps({'key': user_key, 'mode': mode, 'model': model or '',
+                          'compiler': compiler_version}, sort_keys=True, separators=(',', ':'))
+    return 'v2:' + hashlib.sha256(payload.encode()).hexdigest()
+
+
 def init():
     config.DATA.mkdir(parents=True, exist_ok=True)
     (config.DATA / 'assets').mkdir(exist_ok=True)

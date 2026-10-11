@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / '后端代码'))
 import config
 import store
 import provider
+import segmentation
 from app import app
 
 
@@ -112,6 +113,70 @@ def test_snapshot_independent_idempotency_restore(client):
     other=submit(client,client.get('/api/drafts/'+restored['id']).json(),'submission-key-002')
     assert other['id']!=job['id']
     assert len(client.get('/api/jobs').json()['items'])==2
+
+
+def test_simulation_idempotency_does_not_shadow_live_submission(client,monkeypatch):
+    state=ready(client)
+    simulated=submit(client,state,'same-user-action-key')
+    assert simulated['status']=='simulated'
+    calls=[]
+    monkeypatch.setattr(config,'MODE','live');monkeypatch.setattr(config,'EXPERIMENTAL',True)
+    monkeypatch.setattr(config,'MODEL','image-2.5-live-test')
+    monkeypatch.setattr(provider,'preflight',lambda:{})
+    monkeypatch.setattr(provider,'call',lambda compiled: calls.append(compiled) or (_ for _ in ()).throw(RuntimeError('injected unknown upstream result')))
+    live=submit(client,state,'same-user-action-key')
+    assert live['id']!=simulated['id']
+    assert live['status']=='unknown'
+    assert live['snapshot']['mode']=='live'
+    assert len(calls)==1
+
+
+def test_unknown_live_idempotency_is_never_resubmitted(client,monkeypatch):
+    state=ready(client);calls=[]
+    monkeypatch.setattr(config,'MODE','live');monkeypatch.setattr(config,'EXPERIMENTAL',True)
+    monkeypatch.setattr(config,'MODEL','image-2.5-live-test')
+    monkeypatch.setattr(provider,'preflight',lambda:{})
+    monkeypatch.setattr(provider,'call',lambda compiled: calls.append(compiled) or (_ for _ in ()).throw(RuntimeError('injected unknown upstream result')))
+    first=submit(client,state,'unknown-paid-action')
+    second=submit(client,state,'unknown-paid-action')
+    assert first['status']==second['status']=='unknown'
+    assert first['id']==second['id']
+    assert len(calls)==1
+
+
+def test_legacy_unknown_paid_idempotency_is_preserved(client,monkeypatch):
+    state=ready(client);calls=[]
+    monkeypatch.setattr(config,'MODE','live');monkeypatch.setattr(config,'EXPERIMENTAL',True)
+    monkeypatch.setattr(config,'MODEL','image-2.5-live-test')
+    monkeypatch.setattr(provider,'preflight',lambda:{})
+    compiled=provider.compile_request(state)
+    snapshot={'state':state,'compiled':compiled,'mode':'live','model':config.MODEL,'created':time.time()}
+    jid=store.uid()
+    with store.db() as con:
+        con.execute('INSERT INTO jobs(id,idem,created,status,snapshot,result) VALUES(?,?,?,?,?,?)',
+                    (jid,'legacy-paid-key',time.time(),'unknown',json.dumps(snapshot),json.dumps({'error':'upstream unknown'})))
+    monkeypatch.setattr(provider,'call',lambda compiled:calls.append(compiled))
+    repeated=submit(client,state,'legacy-paid-key')
+    assert repeated['id']==jid and repeated['status']=='unknown'
+    assert calls==[]
+
+
+def test_sam_native_crash_does_not_take_down_api_or_generation(client,monkeypatch):
+    isolated=segmentation.SamProcessClient(worker='fake_sam_worker:serve',timeout=2)
+    attempts=iter(('crash','prepare'))
+    monkeypatch.setattr(segmentation,'prepare',lambda aid: isolated.request(next(attempts),image_id=aid))
+    try:
+        failed=client.post('/api/segmentation/prepare',json={'image_id':'fault-injection'})
+        assert failed.status_code==503
+        assert client.get('/api/health').json()=={'ok':True}
+        assert client.post('/api/drafts').status_code==200
+        state=ready(client)
+        assert submit(client,state,'generation-after-sam-crash')['status']=='simulated'
+        recovered=client.post('/api/segmentation/prepare',json={'image_id':'fault-injection'})
+        assert recovered.status_code==200
+        assert recovered.json()['method']=='prepare'
+    finally:
+        isolated.close()
 
 
 def test_conflicts_and_version_mismatch(client):

@@ -16,6 +16,8 @@ from fastapi import HTTPException
 import config
 import store
 
+COMPILER_VERSION = 'mixed-input-v3'
+
 
 def preflight():
     if not config.KEY or not config.MODEL or 'image-2.5' not in config.MODEL:
@@ -93,7 +95,7 @@ def compile_request(state, strategy=None):
     if state.get('instructions'):
         lines.append('Additional user requirements: ' + state['instructions'])
     return dict(prompt='\n'.join(lines), inputs=inputs, bindings=bindings, strategy=strategy,
-                compiler_version='mixed-input-v3', model=config.MODEL, mask_mode='disabled-unverified',
+                compiler_version=COMPILER_VERSION, model=config.MODEL, mask_mode='disabled-unverified',
                 quality=os.getenv('IMAGE25_QUALITY') or None, size='auto', execution='batch-experimental')
 
 

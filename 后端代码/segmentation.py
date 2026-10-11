@@ -1,84 +1,106 @@
-"""Real point-prompt SlimSAM; no fabricated rectangle fallback."""
+"""Process-isolated point-prompt SlimSAM; no fabricated rectangle fallback."""
+import atexit
+import importlib
+import multiprocessing
 import threading
-import time
-from collections import OrderedDict
-import numpy as np
-from PIL import Image
-from fastapi import HTTPException
-import config
-import store
+from pathlib import Path
 
-lock = threading.Lock()
-model = processor = torch = None
-embeddings = OrderedDict()
-points_cache = OrderedDict()
+from fastapi import HTTPException
+
+import config
+
+
+def _entry(connection, worker, settings):
+    module_name, function_name = worker.split(':', 1)
+    getattr(importlib.import_module(module_name), function_name)(connection, settings)
+
+
+class SamProcessClient:
+    def __init__(self, worker='sam_worker:serve', timeout=None):
+        self.worker = worker
+        self.timeout = timeout if timeout is not None else float(__import__('os').getenv('SEGMENTATION_TIMEOUT_SECONDS', '180'))
+        self.lock = threading.Lock()
+        self.process = None
+        self.connection = None
+        self.last_failed_pid = None
+        self.context = multiprocessing.get_context('spawn')
+
+    def _settings(self):
+        return {'data_dir': str(config.DATA), 'model_dir': str(config.MODEL_DIR), 'device': config.SEGMENTATION_DEVICE}
+
+    def _start(self):
+        parent, child = self.context.Pipe()
+        process = self.context.Process(target=_entry, args=(child, self.worker, self._settings()), name='slimsam-worker', daemon=True)
+        process.start()
+        child.close()
+        self.connection, self.process = parent, process
+        if not parent.poll(30) or parent.recv() != {'ready': True}:
+            self._discard()
+            raise HTTPException(503, '智能选区进程启动失败，服务其余功能不受影响；请重试选区')
+
+    def _discard(self):
+        process, connection = self.process, self.connection
+        self.process = self.connection = None
+        if process is not None:
+            self.last_failed_pid = process.pid
+            if process.is_alive():
+                process.terminate()
+            process.join(timeout=2)
+            if process.is_alive():
+                process.kill(); process.join(timeout=2)
+        if connection is not None:
+            connection.close()
+
+    def request(self, method, **params):
+        with self.lock:
+            if self.process is None or not self.process.is_alive():
+                self._discard()
+                self._start()
+            try:
+                self.connection.send({'method': method, **params})
+                if not self.connection.poll(self.timeout):
+                    raise TimeoutError('SAM worker timed out')
+                response = self.connection.recv()
+            except (EOFError, BrokenPipeError, OSError, TimeoutError):
+                self._discard()
+                raise HTTPException(503, '智能选区进程异常，服务其余功能不受影响；请重试选区')
+            if not response.get('ok'):
+                raise HTTPException(int(response.get('status', 500)), response.get('detail', '智能选区失败'))
+            return response['result']
+
+    def close(self):
+        with self.lock:
+            if self.process is not None and self.process.is_alive():
+                try:
+                    self.connection.send({'method': 'stop'})
+                    self.process.join(timeout=2)
+                except (EOFError, BrokenPipeError, OSError):
+                    pass
+            self._discard()
+
+
+_client = SamProcessClient()
+atexit.register(_client.close)
 
 
 def available():
     return (config.MODEL_DIR / 'model.safetensors').is_file()
 
 
-def load():
-    global model, processor, torch
-    if model is None:
-        if not available():
-            raise HTTPException(503, '真实分割模型未安装，可手动圈选；请运行下载脚本')
-        import torch as pt
-        from transformers import SamModel, SamProcessor
-        torch = pt
-        torch.set_num_threads(4)
-        # Keep the Windows service stable by defaulting to CPU. CUDA remains an
-        # explicit opt-in after driver stability is verified on the host.
-        device = 'cuda' if config.SEGMENTATION_DEVICE == 'cuda' and torch.cuda.is_available() else 'cpu'
-        model = SamModel.from_pretrained(str(config.MODEL_DIR), local_files_only=True).to(device).eval()
-        processor = SamProcessor.from_pretrained(str(config.MODEL_DIR), local_files_only=True)
-
-
-def prepare_unlocked(aid):
-    load()
-    if aid not in embeddings:
-        im = store.image(aid).convert('RGB')
-        batch = processor(images=im, return_tensors='pt').to(model.device)
-        with torch.inference_mode():
-            encoded = model.get_image_embeddings(batch['pixel_values'])
-        embeddings[aid] = (encoded, batch['original_sizes'], batch['reshaped_input_sizes'])
-        while len(embeddings) > 10:
-            embeddings.popitem(last=False)
-    embeddings.move_to_end(aid)
-    return embeddings[aid]
+def _require_available():
+    if not available():
+        raise HTTPException(503, '真实分割模型未安装，可手动圈选；请运行下载脚本')
 
 
 def prepare(aid):
-    start = time.perf_counter()
-    with lock:
-        prepare_unlocked(aid)
-    return {'ready': True, 'elapsed_ms': round((time.perf_counter() - start) * 1000, 2), 'device': str(model.device)}
+    _require_available()
+    return _client.request('prepare', image_id=aid)
 
 
 def select(aid, x, y):
-    start = time.perf_counter()
-    key = (aid, round(x, 3), round(y, 3))
-    with lock:
-        if key in points_cache:
-            return dict(candidates=points_cache[key], elapsed_ms=round((time.perf_counter() - start) * 1000, 2), cached=True)
-        meta = store.asset(aid)
-        encoded, original, reshaped = prepare_unlocked(aid)
-        # SAM's longest-side transform; point is in orientation-normalized original coordinates.
-        sx = x * float(reshaped[0, 1]); sy = y * float(reshaped[0, 0])
-        with torch.inference_mode():
-            out = model(image_embeddings=encoded, input_points=torch.tensor([[[[sx, sy]]]], device=model.device),
-                        input_labels=torch.tensor([[[1]]], device=model.device), multimask_output=True)
-            masks = processor.image_processor.post_process_masks(out.pred_masks.cpu(), original.cpu(), reshaped.cpu())[0][0]
-            scores = out.iou_scores[0, 0].cpu().numpy()
-        result = []
-        for i in np.argsort(-scores):
-            values = masks[int(i)].numpy().astype('uint8') * 255
-            if not values[min(meta['height'] - 1, int(y * meta['height'])), min(meta['width'] - 1, int(x * meta['width']))]:
-                continue
-            if values.any():
-                mask = store.mask_asset(Image.fromarray(values), aid, 'slimsam-77-uniform', {'score': float(scores[i])})
-                result.append(mask)
-        points_cache[key] = result
-        while len(points_cache) > 100:
-            points_cache.popitem(last=False)
-    return dict(candidates=result, elapsed_ms=round((time.perf_counter() - start) * 1000, 2), cached=False)
+    _require_available()
+    return _client.request('select', image_id=aid, x=x, y=y)
+
+
+def close():
+    _client.close()

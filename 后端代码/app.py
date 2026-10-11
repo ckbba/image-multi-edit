@@ -36,6 +36,7 @@ async def lifespan(app):
     for item in pending:
         worker.submit(provider.execute if item['status'] == 'queued' else provider.save_outputs, item['id'])
     yield
+    segmentation.close()
 
 
 app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
@@ -200,8 +201,15 @@ async def submit(request: Request):
     idem = data.get('idempotency_key', '')
     if not 10 <= len(idem) <= 160:
         raise HTTPException(400, '缺少有效提交标识')
+    idem_scope = store.idempotency_scope(idem, config.MODE, config.MODEL, provider.COMPILER_VERSION)
     with store.db() as con:
-        previous = con.execute('SELECT id FROM jobs WHERE idem=?', (idem,)).fetchone()
+        previous = con.execute('SELECT id FROM jobs WHERE idem=?', (idem_scope,)).fetchone()
+        legacy = con.execute('SELECT id,snapshot FROM jobs WHERE idem=?', (idem,)).fetchone() if not previous else None
+    if legacy:
+        old = json.loads(legacy['snapshot'])
+        old_compiler = old.get('compiled', {}).get('compiler_version')
+        if old.get('mode') == config.MODE and old.get('model', '') == (config.MODEL or '') and old_compiler == provider.COMPILER_VERSION:
+            previous = legacy
     if previous:
         return public_job(store.job(previous['id'], True))
     state = get_draft(data['draft_id'])
@@ -222,9 +230,9 @@ async def submit(request: Request):
     with store.db() as con:
         try:
             con.execute('INSERT INTO jobs(id,idem,created,status,snapshot) VALUES(?,?,?,?,?)',
-                        (jid, idem, time.time(), 'queued', json.dumps(snapshot)))
+                        (jid, idem_scope, time.time(), 'queued', json.dumps(snapshot)))
         except sqlite3.IntegrityError:
-            jid = con.execute('SELECT id FROM jobs WHERE idem=?', (idem,)).fetchone()['id']
+            jid = con.execute('SELECT id FROM jobs WHERE idem=?', (idem_scope,)).fetchone()['id']
             return public_job(store.job(jid, True))
     worker.submit(provider.execute, jid)
     return public_job(store.job(jid))
