@@ -86,11 +86,51 @@ async function renderEditorState(){if(!$('#mapping-list'))return;
   $('#project-name').value=state.name;$('#undo').disabled=!undo.past.length;$('#redo').disabled=!undo.future.length;
   if(!state.references.includes(currentRef))currentRef=state.references[0];
   $('#reference-count').textContent=`${state.references.length} / ${REFERENCE_UPLOAD_LIMIT}`;
-  $('#filmstrip').innerHTML=state.references.map((id,i)=>`<div class="thumb ${id===currentRef?'selected':''}" style="--stack:${i}"><button data-ref="${id}" title="参考图 ${i+1}"><img src="${url(id,true)}" alt="参考图 ${i+1}"><span>${String(i+1).padStart(2,'0')}</span></button><button class="remove-ref" data-remove="${id}" title="删除参考图 ${i+1}">×</button></div>`).join('')+`<label class="add-ref file-button" title="添加参考图">＋<input type="file" id="refs-upload" multiple accept="image/jpeg,image/png,image/webp"></label>`;
+  const refCount=state.references.length;
+  $('#filmstrip').className='filmstrip '+(refCount>6?'compact-strip':'standard-strip');
+  $('#filmstrip').innerHTML=state.references.map((id,i)=>`<div class="thumb ${id===currentRef?'selected':''}" data-id="${id}" data-index="${i+1}" style="--stack:${i}"><button data-ref="${id}" title="参考图 ${i+1}"><img src="${url(id,true)}" alt="参考图 ${i+1}"><span>${String(i+1).padStart(2,'0')}</span></button><button class="remove-ref" data-remove="${id}" title="删除参考图 ${i+1}">×</button></div>`).join('')+`<label class="add-ref file-button" title="添加参考图">＋<input type="file" id="refs-upload" multiple accept="image/jpeg,image/png,image/webp"></label>`;
+  bindHoverPreviews();
   document.querySelectorAll('[data-ref]').forEach(b=>b.onclick=()=>{resetSelection();currentRef=b.dataset.ref;editor().catch(e=>toast(e.message));});
   document.querySelectorAll('[data-remove]').forEach(b=>b.onclick=()=>{const affected=state.mappings.filter(m=>m.source.image_id===b.dataset.remove),whole=state.full_image_refs.filter(r=>r.image_id===b.dataset.remove);if((affected.length||whole.length)&&!confirm(`此素材关联 ${affected.length} 个元素操作和 ${whole.length} 个整图引用，将一起移除。继续？`))return;mutate(s=>{s.references=s.references.filter(id=>id!==b.dataset.remove);s.mappings=s.mappings.filter(m=>m.source.image_id!==b.dataset.remove);s.full_image_refs=s.full_image_refs.filter(r=>r.image_id!==b.dataset.remove);});});
   $('#refs-upload').onchange=safe(e=>upload(e.target.files,'reference'));
   await Promise.all(['main','reference'].map(async side=>{const p=panels[side];if(!p)return;const id=side==='main'?state.main_image:currentRef;if(p.id!==id){p.request.cancel();p.id=id;p.selection=null;p.im=id?await getImage(id):null;if(id)prepareImage(id,side);}$('#'+side+'-empty').hidden=!!id;drawPanel(side);}));renderList();
+}
+let hoverPreviewEl=null;
+function ensureHoverPreview(){
+  if(!hoverPreviewEl){hoverPreviewEl=document.createElement('div');hoverPreviewEl.id='asset-hover-preview';hoverPreviewEl.className='asset-hover-preview';hoverPreviewEl.hidden=true;document.body.appendChild(hoverPreviewEl);}
+  return hoverPreviewEl;
+}
+function showHoverPreview(imgUrl,badgeText,targetRect,align='left'){
+  const el=ensureHoverPreview();
+  el.innerHTML=`<div class="hover-preview-card"><span class="hover-preview-badge">${esc(badgeText||'智能参考')}</span><img src="${imgUrl}" alt="预览"></div>`;
+  el.hidden=false;el.style.opacity='0';el.style.transform='scale(0.95)';
+  const cardW=260;
+  let top=targetRect.top+(targetRect.height/2)-130;
+  if(top<12)top=12;
+  if(top+280>window.innerHeight)top=Math.max(12,window.innerHeight-290);
+  let left;
+  if(align==='left'){
+    left=targetRect.left-cardW-14;
+    if(left<10)left=targetRect.right+14;
+  }else{
+    left=targetRect.left+(targetRect.width/2)-(cardW/2);
+    top=Math.max(12,targetRect.top-270);
+  }
+  el.style.top=top+'px';el.style.left=left+'px';
+  requestAnimationFrame(()=>{el.style.opacity='1';el.style.transform='scale(1)';});
+}
+function hideHoverPreview(){
+  if(hoverPreviewEl&&!hoverPreviewEl.hidden){
+    hoverPreviewEl.style.opacity='0';hoverPreviewEl.style.transform='scale(0.95)';
+    setTimeout(()=>{if(hoverPreviewEl&&hoverPreviewEl.style.opacity==='0')hoverPreviewEl.hidden=true;},150);
+  }
+}
+function bindHoverPreviews(){
+  document.querySelectorAll('#filmstrip .thumb').forEach(thumb=>{
+    const id=thumb.dataset.id,idx=thumb.dataset.index;
+    thumb.onmouseenter=()=>{const rect=thumb.getBoundingClientRect();showHoverPreview(url(id),`智能参考 · ${String(idx).padStart(2,'0')}`,rect,'left');};
+    thumb.onmouseleave=hideHoverPreview;
+  });
 }
 function renderList(){if(!$('#mapping-list'))return;$('#operation-count').textContent=`${state.mappings.length} / ${MAPPING_DRAFT_LIMIT}`;
   const total=generationReferenceCount(state),over=total>MODEL_REFERENCE_LIMIT;$('#generate').textContent=submitting?'提交中…':`${config.mode==='simulation'?'检查模拟流程':'✦ 生成'}（参考输入 ${total} / ${MODEL_REFERENCE_LIMIT}）`;
@@ -111,7 +151,11 @@ function syncComposer(){const editor=$('#composer-editor');if(!editor)return;let
 function bindComposer(){const editor=$('#composer-editor');if(!editor)return;editor.oninput=syncComposer;editor.onkeyup=event=>{rememberComposerRange();if(event.key==='@'){consumeMentionTrigger();renderMentionMenu();$('#mention-menu').hidden=false;}};editor.onmouseup=rememberComposerRange;editor.onfocus=rememberComposerRange;editor.querySelectorAll('[data-bubble]').forEach(el=>el.onclick=event=>{event.preventDefault();event.stopPropagation();if(el.dataset.bubble)openBubble(el.dataset.bubble);});editor.querySelectorAll('[data-remove-whole]').forEach(el=>el.onclick=event=>{event.preventDefault();event.stopPropagation();mutate(s=>s.full_image_refs=s.full_image_refs.filter(r=>r.id!==el.dataset.removeWhole));});}
 function renderComposer(force=false){const editor=$('#composer-editor'),assets=$('#composer-assets');if(!editor)return;const active=document.activeElement===editor||editor.contains(document.activeElement);if(force||!active)editor.innerHTML=state.mappings.map(m=>fragmentMarkup('mapping',m.id,`元素 ${m.display_index} · ${m.source.label||'未命名'}`,m.source.image_id,m.requirement||'',m.color)).join('')+state.full_image_refs.map(r=>fragmentMarkup('full-image',r.id,`整图 · ${r.label}`,r.image_id,r.purpose||'')).join('')+`<span class="composer-fragment global" data-kind="global" data-id="global"><span class="composer-text" data-placeholder="输入其他全局要求…">${esc(state.instructions||'')}</span></span>`;
   const pool=[...(state.main_image?[{id:state.main_image,label:'主图'}]:[]),...state.references.map((id,i)=>({id,label:`参考图 ${i+1}`}))];assets.innerHTML=pool.length?`<span class="asset-stack-label">素材</span><span class="asset-stack">${pool.map((a,i)=>`<button type="button" data-asset-menu="${a.id}" style="--i:${i}" title="${a.label} · 点击打开 @ 菜单"><img src="${url(a.id,true)}" alt="${a.label}"></button>`).join('')}</span><small>悬停展开 · 点击引用</small>`:'<small>暂无素材，请从上方上传入口添加</small>';
-  assets.querySelectorAll('[data-asset-menu]').forEach(button=>button.onclick=()=>{rememberComposerRange();renderMentionMenu();$('#mention-menu').hidden=false;});bindComposer();}
+  assets.querySelectorAll('[data-asset-menu]').forEach(button=>{
+    button.onclick=()=>{rememberComposerRange();renderMentionMenu();$('#mention-menu').hidden=false;};
+    button.onmouseenter=()=>{const rect=button.getBoundingClientRect();showHoverPreview(url(button.dataset.assetMenu),button.title?button.title.split(' · ')[0]:'素材参考',rect,'top');};
+    button.onmouseleave=hideHoverPreview;
+  });bindComposer();}
 function focusFragmentPurpose(fragment){const text=fragment?.querySelector('.composer-text');if(!text)return;const range=document.createRange();range.selectNodeContents(text);range.collapse(false);const selection=getSelection();selection.removeAllRanges();selection.addRange(range);composerRange=range.cloneRange();$('#composer-editor').focus();fragment.classList.add('just-inserted');setTimeout(()=>fragment.classList.remove('just-inserted'),700);}
 function insertComposerFragment(kind,id){renderComposer(true);focusFragmentPurpose($('#composer-editor').querySelector(`.composer-fragment[data-kind="${kind}"][data-id="${id}"]`));}
 function renderMentionMenu(){const menu=$('#mention-menu');if(!menu)return;const whole=state.references.map((id,i)=>`<button data-add-whole="${id}" data-label="参考图 ${i+1}"><img src="${url(id,true)}" alt=""><span><b>整图</b> · 参考图 ${i+1}<small>完整图片参考</small></span></button>`).join('');const elements=state.mappings.map(m=>`<button data-insert-element="${m.id}"><img src="${url(m.source.image_id,true)}" alt=""><span><b>元素 ${m.display_index}</b> · ${esc(m.source.label||'未命名')}<small>已选区域裁剪</small></span></button>`).join('');menu.innerHTML=`<b>蓝色 · 完整参考图</b>${whole||'<small>请先从现有上传入口添加参考图</small>'}<b>紫色 · 已选元素</b>${elements||'<small>拖入主图后会出现在这里</small>'}`;menu.querySelectorAll('[data-add-whole]').forEach(b=>b.onclick=()=>{const imageId=b.dataset.addWhole;let ref=state.full_image_refs.find(r=>r.image_id===imageId);if(!ref){ref={id:crypto.randomUUID(),image_id:imageId,label:b.dataset.label,purpose:''};undo.push(state);state.full_image_refs.push(ref);changed();}menu.hidden=true;renderComposer(true);focusFragmentPurpose($('#composer-editor').querySelector(`.composer-fragment[data-kind="full-image"][data-id="${ref.id}"]`));renderList();});menu.querySelectorAll('[data-insert-element]').forEach(b=>b.onclick=()=>{menu.hidden=true;insertComposerFragment('mapping',b.dataset.insertElement);});}
