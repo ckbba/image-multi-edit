@@ -107,7 +107,7 @@ def settings():
     return {'mode': config.MODE, 'model': config.MODEL or 'Image2.5 尚未配置', 'segmentation': segmentation.available(),
             'generation_ready': config.MODE == 'live' and bool(config.KEY and config.MODEL and config.EXPERIMENTAL),
             'source_strategy': config.SOURCE_STRATEGY, 'cost': '按渠道实际用量结算；接口未公开可靠单价',
-            'limits': {'references': 8, 'mappings': 5, 'megabytes': 20}, 'mask_mode': '原生 Mask 未验证，当前使用选区文字约束'}
+            'limits': {'references': 12, 'mappings': 20, 'model_references': 12, 'megabytes': 20}, 'mask_mode': '原生 Mask 未验证，当前使用选区文字约束'}
 
 
 @app.post('/api/assets')

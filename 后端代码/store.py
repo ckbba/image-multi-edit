@@ -130,14 +130,19 @@ def manual_mask(image_id, points):
 
 
 COLORS = ['#8b5cf6', '#3b82f6', '#f59e0b', '#10b981', '#ec4899']
+REFERENCE_UPLOAD_LIMIT = 12
+MAPPING_DRAFT_LIMIT = 20
+MODEL_REFERENCE_LIMIT = 12
 
 
 def validate(state, for_submit=False, allow_overlap=False):
     mappings = state.get('mappings', [])
     refs = state.get('references', [])
     whole_refs = state.get('full_image_refs', [])
-    if len(refs) > 8 or len(mappings) > 5 or len(set(refs)) != len(refs):
-        raise HTTPException(400, '最多 8 张不同参考图和 5 条有效编辑')
+    if len(refs) > REFERENCE_UPLOAD_LIMIT or len(set(refs)) != len(refs):
+        raise HTTPException(400, '最多 12 张参考图，且不能重复添加同一素材')
+    if len(mappings) > MAPPING_DRAFT_LIMIT:
+        raise HTTPException(400, '最多 20 条元素草稿')
     if len(state.get('instructions', '')) > 2000 or len(state.get('name', '')) > 100:
         raise HTTPException(400, '项目名或补充要求过长')
     if state.get('source_strategy', 'full') not in ('full', 'context-crop', 'transparent'):
@@ -194,6 +199,9 @@ def validate(state, for_submit=False, allow_overlap=False):
         raise HTTPException(400, '下个编号必须大于已分配编号')
     if for_submit and (not main or (not mappings and not whole_refs)):
         raise HTTPException(400, '请准备主图和至少一条有效编辑关系或整图引用')
+    actual_references = len(mappings) + len(whole_refs)
+    if for_submit and actual_references > MODEL_REFERENCE_LIMIT:
+        raise HTTPException(400, f'当前共 {actual_references} 个实际参考输入，最多 12 个；请删除部分元素操作或整图引用后再生成')
     if for_submit and not mappings and whole_refs and not (state.get('instructions', '').strip() or any(r.get('purpose', '').strip() for r in whole_refs)):
         raise HTTPException(400, '仅整图引用时请填写明确要求')
     if for_submit and conflicts and not allow_overlap:
@@ -204,7 +212,7 @@ def validate(state, for_submit=False, allow_overlap=False):
 
 def new_draft(state=None):
     state = json.loads(json.dumps(state)) if state else dict(schema_version=3, name='未命名编辑', main_image=None,
-        references=[], mappings=[], full_image_refs=[], next_display_index=1, instructions='')
+        references=[], mappings=[], full_image_refs=[], next_display_index=1, instructions='', source_strategy='context-crop')
     state['id'] = uid()
     state['project_id'] = state.get('project_id', uid())
     state['revision'] = 0
@@ -212,6 +220,7 @@ def new_draft(state=None):
     state.setdefault('references', [])
     state.setdefault('full_image_refs', [])
     state.setdefault('instructions', '')
+    state.setdefault('source_strategy', 'context-crop')
     state.setdefault('next_display_index', max([m['display_index'] for m in state.get('mappings', [])], default=0) + 1)
     with db() as con:
         con.execute('INSERT INTO drafts VALUES(?,?,?,?)', (state['id'], 0, time.time(), json.dumps(state)))

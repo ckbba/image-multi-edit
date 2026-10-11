@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {imageRect,toImage,createMapping,addMapping,UndoStack,LatestRequest,COLORS,normalizeEditorState,composerEntries,confirmRequirement,cancelRequirementDraft,composerFragmentText,applyComposerFragment,retryTransient} from '../前端代码/core.js';
+import {imageRect,toImage,createMapping,addMapping,UndoStack,LatestRequest,COLORS,normalizeEditorState,composerEntries,confirmRequirement,cancelRequirementDraft,composerFragmentText,applyComposerFragment,retryTransient,REFERENCE_UPLOAD_LIMIT,MAPPING_DRAFT_LIMIT,MODEL_REFERENCE_LIMIT,generationReferenceCount,assertGenerationReferenceLimit} from '../前端代码/core.js';
 
 test('letterbox coordinates remain stable across viewport sizes; margins reject points',()=>{
  for(const [w,h] of [[500,400],[200,700],[1200,500]]){const r=imageRect(w,h,1200,800);const p=toImage(r.x+r.width*.25,r.y+r.height*.75,r);assert.ok(Math.abs(p.x-.25)<1e-10);assert.ok(Math.abs(p.y-.75)<1e-10);assert.equal(toImage(r.x-1,r.y,r),null);}
@@ -44,4 +44,18 @@ test('unified composer fragments update the same state fields without flattening
  assert.equal(changed.mappings[0].requirement,'已有句子中改写动作');
  assert.equal(changed.full_image_refs[0].purpose,'参考街景');
  assert.equal(changed.instructions,'保留自然光');
+});
+
+test('product limits allow 12 uploads and 20 mapping drafts',()=>{
+ assert.equal(REFERENCE_UPLOAD_LIMIT,12);
+ assert.equal(MAPPING_DRAFT_LIMIT,20);
+ assert.equal(MODEL_REFERENCE_LIMIT,12);
+});
+
+test('generation reference guard counts mixed element and whole-image inputs but not main image',()=>{
+ const state={main_image:'main',mappings:Array.from({length:11},(_,i)=>({id:`m${i}`})),full_image_refs:[{id:'whole'}]};
+ assert.equal(generationReferenceCount(state),12);
+ assert.doesNotThrow(()=>assertGenerationReferenceLimit(state));
+ state.full_image_refs.push({id:'whole-2'});
+ assert.throws(()=>assertGenerationReferenceLimit(state),/当前共 13 个实际参考输入，最多 12 个/);
 });

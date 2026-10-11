@@ -1,4 +1,9 @@
 export const COLORS=['#8b5cf6','#3b82f6','#f59e0b','#10b981','#ec4899'];
+export const REFERENCE_UPLOAD_LIMIT=12;
+export const MAPPING_DRAFT_LIMIT=20;
+export const MODEL_REFERENCE_LIMIT=12;
+export const generationReferenceCount=state=>(state.mappings?.length||0)+(state.full_image_refs?.length||0);
+export function assertGenerationReferenceLimit(state){const count=generationReferenceCount(state);if(count>MODEL_REFERENCE_LIMIT)throw new Error(`当前共 ${count} 个实际参考输入，最多 ${MODEL_REFERENCE_LIMIT} 个；请删除部分元素操作或整图引用后再生成`);return count;}
 export const clone=v=>structuredClone(v);
 export function imageRect(width,height,imageWidth,imageHeight){const scale=Math.min(width/imageWidth,height/imageHeight);return {x:(width-imageWidth*scale)/2,y:(height-imageHeight*scale)/2,width:imageWidth*scale,height:imageHeight*scale};}
 export function toImage(x,y,r){if(x<r.x||y<r.y||x>r.x+r.width||y>r.y+r.height)return null;return {x:(x-r.x)/r.width,y:(y-r.y)/r.height};}
@@ -8,7 +13,7 @@ export class UndoStack{constructor(){this.past=[];this.future=[];}push(state){th
 export class LatestRequest{constructor(){this.version=0;this.controller=null;}cancel(){this.version++;this.controller?.abort();}start(){this.cancel();this.controller=new AbortController();return {version:this.version,signal:this.controller.signal};}current(version){return version===this.version;}}
 export function transientError(error){return error?.name!=='AbortError'&&(error instanceof TypeError||(Number.isInteger(error?.status)&&error.status>=500));}
 export async function retryTransient(operation,{delays=[250,750],signal,onRetry=()=>{}}={}){let attempt=0;while(true){if(signal?.aborted)throw new DOMException('Aborted','AbortError');try{return await operation(attempt);}catch(error){if(!transientError(error)||attempt>=delays.length)throw error;onRetry(attempt+1,error);const delay=delays[attempt++];await new Promise((resolve,reject)=>{const timer=setTimeout(done,delay);function done(){signal?.removeEventListener('abort',abort);resolve();}function abort(){clearTimeout(timer);reject(new DOMException('Aborted','AbortError'));}signal?.addEventListener('abort',abort,{once:true});});}}}
-export function normalizeEditorState(value){const state=clone(value);state.instructions??='';state.full_image_refs??=[];state.mappings??=[];for(const mapping of state.mappings)mapping.requirement??='';return state;}
+export function normalizeEditorState(value){const state=clone(value);state.instructions??='';state.full_image_refs??=[];state.mappings??=[];state.source_strategy??='context-crop';for(const mapping of state.mappings)mapping.requirement??='';return state;}
 export function composerEntries(value){const state=normalizeEditorState(value);return [...state.mappings.map(m=>({kind:'mapping',id:m.id,text:m.requirement||'',mapping:m})),...state.full_image_refs.map(r=>({kind:'full-image',id:r.id,text:r.purpose||'',reference:r})),{kind:'global',id:'global',text:state.instructions||''}];}
 export function confirmRequirement(value,id,text){const state=normalizeEditorState(value),mapping=state.mappings.find(m=>m.id===id);if(mapping)mapping.requirement=String(text).slice(0,1000);return state;}
 export function cancelRequirementDraft(value){return normalizeEditorState(value);}

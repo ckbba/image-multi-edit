@@ -211,6 +211,13 @@ def test_context_crop_complete_and_only_referenced(client):
     assert store.asset(state['mappings'][0]['source']['mask_id'])['origin']['method']=='manual-polygon'
 
 
+def test_default_compile_uses_element_context_crop_even_for_legacy_full_state(client):
+    state=ready(client);state['source_strategy']='full'
+    compiled=provider.compile_request(state)
+    assert compiled['strategy']=='context-crop'
+    assert compiled['bindings'][0]['crop'] is not None
+
+
 def test_overlapping_targets_keep_distinct_anchor_intent(client):
     state=ready(client)
     second=copy.deepcopy(state['mappings'][0]);second.update(id='other-point',display_index=2,color=store.COLORS[1])
@@ -272,3 +279,47 @@ def test_continue_from_result_clears_old_regions_and_references(client,monkeypat
     assert continued['main_image']==out and continued['mappings']==[]
     assert continued['full_image_refs']==[] and continued['references']==[]
     assert continued['instructions']=='' and continued['next_display_index']==1
+
+
+def test_reference_upload_limit_accepts_12_and_rejects_13(client):
+    main=upload(client)
+    refs=[upload(client, f'#{i:02x}0000')['id'] for i in range(1,14)]
+    state=client.post('/api/drafts').json();state.update(main_image=main['id'],references=refs[:12])
+    accepted=client.put('/api/drafts/'+state['id'],json=state)
+    assert accepted.status_code==200,accepted.text
+    state=client.get('/api/drafts/'+state['id']).json();state['references']=refs
+    rejected=client.put('/api/drafts/'+state['id'],json=state)
+    assert rejected.status_code==400
+    assert '最多 12 张参考图' in rejected.json()['detail']
+
+
+def test_mapping_draft_limit_accepts_20_and_rejects_21(client):
+    state=ready(client);base=state['mappings'][0]
+    state['mappings']=[]
+    for i in range(20):
+        item=copy.deepcopy(base);item.update(id=f'mapping-{i+1}',display_index=i+1,color=store.COLORS[i%5])
+        state['mappings'].append(item)
+    state['next_display_index']=21
+    assert client.post('/api/validate',json=state).status_code==200
+    extra=copy.deepcopy(base);extra.update(id='mapping-21',display_index=21,color=store.COLORS[0])
+    state['mappings'].append(extra);state['next_display_index']=22
+    rejected=client.post('/api/validate',json=state)
+    assert rejected.status_code==400
+    assert '最多 20 条元素草稿' in rejected.json()['detail']
+
+
+def test_submit_guard_rejects_more_than_12_actual_mixed_references(client):
+    state=ready(client);base=state['mappings'][0]
+    state['mappings']=[]
+    for i in range(11):
+        item=copy.deepcopy(base);item.update(id=f'active-{i+1}',display_index=i+1,color=store.COLORS[i%5])
+        state['mappings'].append(item)
+    state['next_display_index']=12
+    source=state['references'][0]
+    state['full_image_refs']=[{'id':'whole-1','image_id':source,'label':'参考图 1','purpose':'参考背景'}]
+    store.validate(state,True,True)
+    state['full_image_refs'].append({'id':'whole-2','image_id':source,'label':'参考图 1','purpose':'参考色调'})
+    with pytest.raises(Exception) as error:
+        store.validate(state,True,True)
+    assert getattr(error.value,'status_code',None)==400
+    assert '当前共 13 个实际参考输入，最多 12 个' in error.value.detail

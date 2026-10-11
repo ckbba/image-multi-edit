@@ -62,7 +62,7 @@ try:
     page.get_by_role('button',name='＋ 新建编辑').click()
     page.locator('#main-upload').set_input_files(str(ROOT/'evidence/samples/fashion-a.png'))
     page.locator('#refs-upload').set_input_files([str(ROOT/'evidence/samples'/n) for n in ['bag.png','shoes.png','fashion-b.png']])
-    expect(page.locator('#reference-count')).to_have_text('3 / 8')
+    expect(page.locator('#reference-count')).to_have_text('3 / 12')
     page.get_by_title('参考图 1',exact=True).click()
     expect(page.locator('#image-viewer')).to_be_visible();page.locator('#viewer-close').click()
     expect(page.locator('#reference-status')).to_contain_text('选区已准备',timeout=120000)

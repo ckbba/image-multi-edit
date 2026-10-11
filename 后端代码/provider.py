@@ -41,7 +41,12 @@ def png(im):
 
 
 def compile_request(state, strategy=None):
-    strategy = strategy or state.get('source_strategy') or config.SOURCE_STRATEGY
+    actual_references = len(state.get('mappings', [])) + len(state.get('full_image_refs', []))
+    if actual_references > store.MODEL_REFERENCE_LIMIT:
+        raise HTTPException(400, f'当前共 {actual_references} 个实际参考输入，最多 12 个；请删除部分元素操作或整图引用后再生成')
+    # Element bindings always use the product's context crop. Whole-image intent is
+    # represented separately by explicit full_image_refs, never by a global switch.
+    strategy = strategy or 'context-crop'
     if strategy not in ('full', 'context-crop', 'transparent'):
         raise ValueError('Unknown source strategy')
     inputs = [state['main_image']]
