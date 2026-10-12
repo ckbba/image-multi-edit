@@ -3,6 +3,7 @@ import atexit
 import importlib
 import multiprocessing
 import threading
+import time
 from pathlib import Path
 
 from fastapi import HTTPException
@@ -80,6 +81,9 @@ class SamProcessClient:
 
 
 _client = SamProcessClient()
+_box_cache = {}
+_box_cache_lock = threading.Lock()
+_BOX_TTL = 3600
 atexit.register(_client.close)
 
 
@@ -100,6 +104,41 @@ def prepare(aid):
 def select(aid, x, y):
     _require_available()
     return _client.request('select', image_id=aid, x=x, y=y)
+
+
+def cache_boxes(aid, objects):
+    now = time.time()
+    with _box_cache_lock:
+        current = _box_cache.get(aid)
+        if current and now - current['updated'] < _BOX_TTL:
+            return {'objects': current['objects'], 'cached': True}
+    masked = []
+    for item in objects[:12]:
+        try:
+            mask = _client.request('box', image_id=aid, box=item['box'])
+        except HTTPException:
+            continue
+        masked.append({**item, 'mask_id': mask['id'], 'bbox': mask['bbox']})
+    with _box_cache_lock:
+        _box_cache[aid] = {'updated': now, 'objects': masked}
+    return {'objects': masked, 'cached': False}
+
+
+def cached_hit(aid, x, y):
+    with _box_cache_lock:
+        objects = list((_box_cache.get(aid) or {}).get('objects', []))
+    hits = []
+    for item in objects:
+        x1, y1, x2, y2 = item['box']
+        if x1 <= x <= x2 and y1 <= y <= y2:
+            try:
+                image = __import__('store').image(item['mask_id']).getchannel('A')
+                px = min(image.width - 1, int(x * image.width)); py = min(image.height - 1, int(y * image.height))
+                if image.getpixel((px, py)):
+                    hits.append(item)
+            except Exception:
+                continue
+    return min(hits, key=lambda item: (item['box'][2]-item['box'][0])*(item['box'][3]-item['box'][1]), default=None)
 
 
 def close():

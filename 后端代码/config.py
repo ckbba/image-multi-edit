@@ -24,3 +24,7 @@ KEY = os.getenv('IMAGE25_API_KEY', '')
 MODEL = os.getenv('IMAGE25_MODEL', '')
 EXPERIMENTAL = os.getenv('IMAGE25_EXPERIMENTAL', 'false').lower() == 'true'
 SOURCE_STRATEGY = os.getenv('SOURCE_STRATEGY', 'full')
+GEMINI_BASE = os.getenv('GEMINI_BASE_URL', 'https://cccodex.cn/v1/chat/completions')
+GEMINI_KEY = os.getenv('GEMINI_API_KEY', '')
+GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-2.5-flash-lite')
+GEMINI_TIMEOUT = float(os.getenv('GEMINI_TIMEOUT_SECONDS', '45'))

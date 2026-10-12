@@ -19,6 +19,8 @@ import config
 import store
 import segmentation
 import provider
+import recognition
+import text_recognition
 
 worker = ThreadPoolExecutor(max_workers=1, thread_name_prefix='image-jobs')
 login_attempts = {}
@@ -108,13 +110,18 @@ def settings():
     return {'mode': config.MODE, 'model': config.MODEL or 'Image2.5 尚未配置', 'segmentation': segmentation.available(),
             'generation_ready': config.MODE == 'live' and bool(config.KEY and config.MODEL and config.EXPERIMENTAL),
             'source_strategy': config.SOURCE_STRATEGY, 'cost': '按渠道实际用量结算；接口未公开可靠单价',
-            'limits': {'references': 12, 'mappings': 20, 'model_references': 12, 'megabytes': 20}, 'mask_mode': '原生 Mask 未验证，当前使用选区文字约束'}
+            'limits': {'references': 12, 'mappings': 20, 'model_references': 12, 'megabytes': 20}, 'mask_mode': '原生 Mask 未验证，当前使用选区文字约束',
+            'object_recognition': bool(config.GEMINI_KEY and segmentation.available()), 'recognition_model': config.GEMINI_MODEL,
+            'text_recognition': text_recognition.available(), 'text_recognition_engine': 'RapidOCR（本机）'}
 
 
 @app.post('/api/assets')
-async def upload(file: UploadFile = File(...)):
+async def upload(file: UploadFile = File(...), pre_recognition: bool = False):
     content = await file.read(20 * 1024 * 1024 + 1)
-    return await run_in_threadpool(store.ingest, content, file.filename or 'image')
+    asset = await run_in_threadpool(store.ingest, content, file.filename or 'image')
+    if pre_recognition:
+        recognition.start(asset['id'])
+    return asset
 
 
 @app.get('/api/assets/{aid}/meta')
@@ -140,7 +147,35 @@ async def select(request: Request):
     data = await request.json()
     if not all(isinstance(data.get(k), (int, float)) and 0 <= data[k] <= 1 for k in ('x', 'y')):
         raise HTTPException(400, '选区点在图像外')
+    hit = await run_in_threadpool(segmentation.cached_hit, data['image_id'], data['x'], data['y'])
+    if hit:
+        return {'candidates': [store.asset(hit['mask_id'])], 'elapsed_ms': 0, 'cached': True,
+                'recognition_cached': True, 'label': hit['label']}
     return await run_in_threadpool(segmentation.select, data['image_id'], data['x'], data['y'])
+
+
+@app.get('/api/recognition/{aid}')
+def recognition_status(aid: str):
+    store.asset(aid)
+    return recognition.status(aid)
+
+
+@app.post('/api/recognition/{aid}/start')
+def start_recognition(aid: str):
+    store.asset(aid)
+    return recognition.start(aid)
+
+
+@app.post('/api/recognition/{aid}/cancel')
+def cancel_recognition(aid: str):
+    store.asset(aid)
+    return recognition.cancel(aid)
+
+
+@app.post('/api/text-recognition/{aid}')
+async def recognize_text(aid: str):
+    store.asset(aid)
+    return await run_in_threadpool(text_recognition.recognize, aid)
 
 
 @app.post('/api/masks')
@@ -201,29 +236,30 @@ async def submit(request: Request):
     idem = data.get('idempotency_key', '')
     if not 10 <= len(idem) <= 160:
         raise HTTPException(400, '缺少有效提交标识')
-    idem_scope = store.idempotency_scope(idem, config.MODE, config.MODEL, provider.COMPILER_VERSION)
+    state = get_draft(data['draft_id'])
+    selected_model = state.get('generation_model', store.DEFAULT_GENERATION_MODEL)
+    if selected_model not in store.GENERATION_MODELS:
+        raise HTTPException(400, '请选择受支持的生成模型')
+    idem_scope = store.idempotency_scope(idem, config.MODE, selected_model, provider.COMPILER_VERSION)
     with store.db() as con:
         previous = con.execute('SELECT id FROM jobs WHERE idem=?', (idem_scope,)).fetchone()
         legacy = con.execute('SELECT id,snapshot FROM jobs WHERE idem=?', (idem,)).fetchone() if not previous else None
     if legacy:
         old = json.loads(legacy['snapshot'])
         old_compiler = old.get('compiled', {}).get('compiler_version')
-        if old.get('mode') == config.MODE and old.get('model', '') == (config.MODEL or '') and old_compiler == provider.COMPILER_VERSION:
+        if old.get('mode') == config.MODE and old.get('model', store.DEFAULT_GENERATION_MODEL) == selected_model and old_compiler == provider.COMPILER_VERSION:
             previous = legacy
     if previous:
         return public_job(store.job(previous['id'], True))
-    state = get_draft(data['draft_id'])
     if state['revision'] != data['revision']:
         raise HTTPException(409, '请先保存当前草稿')
     overlaps = await run_in_threadpool(store.validate, state, True, data.get('allow_overlap') is True)
     if config.MODE == 'live':
-        if state.get('generation_model') and state['generation_model'] != config.MODEL:
-            raise HTTPException(409, '历史模型与当前配置不同；请在服务端核对原模型，禁止静默换模型生成')
         if not config.EXPERIMENTAL:
             raise HTTPException(409, '真实生成尚未通过能力门禁；需明确开启实验性接入')
-        await run_in_threadpool(provider.preflight)
+        await run_in_threadpool(provider.preflight, selected_model)
     compiled = await run_in_threadpool(provider.compile_request, state)
-    snapshot = {'state': state, 'compiled': compiled, 'mode': config.MODE, 'model': config.MODEL,
+    snapshot = {'state': state, 'compiled': compiled, 'mode': config.MODE, 'model': selected_model,
                 'created': time.time(), 'mask_processing': {'dilation': 0, 'feather': 0},
                 'overlap_confirmation': {'accepted': bool(overlaps), 'conflicts': overlaps}}
     jid = store.uid()
@@ -259,7 +295,7 @@ def history(status: str = 'all', offset: int = 0):
     for row in rows:
         item = public_job(store.job(row['id']))
         state = item['snapshot']['state']
-        result.append({k: item[k] for k in ('id', 'created', 'status', 'result')} | {'name': state['name'], 'main_image': state['main_image'], 'count': len(state.get('mappings', [])) + len(state.get('full_image_refs', []))})
+        result.append({k: item[k] for k in ('id', 'created', 'status', 'result')} | {'name': state['name'], 'main_image': state['main_image'], 'count': len(state.get('mappings', [])) + len(state.get('text_edits', [])) + len(state.get('full_image_refs', []))})
     return {'items': result, 'next_offset': offset + 20 if len(result) == 20 else None}
 
 
@@ -282,7 +318,8 @@ async def restore(jid: str, request: Request):
     body = await request.json()
     state = json.loads(json.dumps(job['snapshot']['state']))
     state['origin_history_id'] = jid
-    state['generation_model'] = job['snapshot'].get('model')
+    restored_model = job['snapshot'].get('model')
+    state['generation_model'] = restored_model if restored_model in store.GENERATION_MODELS else store.DEFAULT_GENERATION_MODEL
     state['source_strategy'] = job['snapshot'].get('compiled', {}).get('strategy', 'full')
     state['name'] += ' · 恢复'
     if body.get('use_result'):
@@ -291,6 +328,7 @@ async def restore(jid: str, request: Request):
             raise HTTPException(400, '该输出不存在')
         state['main_image'] = aid
         state['mappings'] = []
+        state['text_edits'] = []
         state['references'] = []
         state['full_image_refs'] = []
         state['instructions'] = ''

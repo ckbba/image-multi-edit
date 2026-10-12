@@ -1,6 +1,4 @@
-"""65535 adapter: compile internal Mapping to documented multipart image[] + text.
-No native mask or placement fields are sent until channel experiments justify them.
-"""
+"""65535 adapter for ordered mixed reference and native-mask edits."""
 import base64
 import io
 import ipaddress
@@ -11,16 +9,18 @@ import time
 from urllib.parse import urlparse
 
 import httpx
+import numpy as np
 from PIL import Image, ImageDraw
 from fastapi import HTTPException
 import config
 import store
 
-COMPILER_VERSION = 'mixed-input-v3'
+COMPILER_VERSION = 'mixed-input-v5-text-edits'
 
 
-def preflight():
-    if not config.KEY or not config.MODEL or 'image-2.5' not in config.MODEL:
+def preflight(model=None):
+    model = model or config.MODEL
+    if not config.KEY or model not in store.GENERATION_MODELS:
         raise HTTPException(409, '必须配置指定 Image2.5 渠道密钥和模型 ID；不会替换模型')
     with httpx.Client(timeout=30) as client:
         headers = {'Authorization': 'Bearer ' + config.KEY}
@@ -32,8 +32,8 @@ def preflight():
         prices = pricing_response.json()
     models = models.get('data', models) if isinstance(models, dict) else models
     prices = prices.get('data', prices) if isinstance(prices, dict) else prices
-    price = next((p for p in prices if p['id'] == config.MODEL), None)
-    if not any(m['id'] == config.MODEL for m in models) or not price or 'image' not in price.get('endpoints', []) or not price.get('online'):
+    price = next((p for p in prices if p['id'] == model), None)
+    if not any(m['id'] == model for m in models) or not price or 'image' not in price.get('endpoints', []) or not price.get('online'):
         raise HTTPException(409, '当前模型在账户不可用、离线或没有 image 端点')
     return price
 
@@ -42,8 +42,23 @@ def png(im):
     f = io.BytesIO(); im.save(f, format='PNG'); return f.getvalue()
 
 
+def native_edit_mask(mask_ids, main_image_id):
+    """Build an OpenAI-style mask where transparent pixels are editable."""
+    base = store.image(main_image_id)
+    alpha = np.full((base.height, base.width), 255, dtype=np.uint8)
+    for mask_id in mask_ids:
+        selected = np.asarray(store.image(mask_id).getchannel('A').resize(base.size, Image.Resampling.NEAREST))
+        alpha = np.minimum(alpha, 255 - selected)
+    result = Image.new('RGBA', base.size, (0, 0, 0, 255))
+    result.putalpha(Image.fromarray(alpha))
+    return png(result)
+
+
 def compile_request(state, strategy=None):
-    actual_references = len(state.get('mappings', [])) + len(state.get('full_image_refs', []))
+    model = state.get('generation_model', store.DEFAULT_GENERATION_MODEL)
+    if model not in store.GENERATION_MODELS:
+        raise HTTPException(400, '请选择受支持的生成模型')
+    actual_references = len([m for m in state.get('mappings', []) if m.get('source')]) + len(state.get('full_image_refs', []))
     if actual_references > store.MODEL_REFERENCE_LIMIT:
         raise HTTPException(400, f'当前共 {actual_references} 个实际参考输入，最多 12 个；请删除部分元素操作或整图引用后再生成')
     # Element bindings always use the product's context crop. Whole-image intent is
@@ -53,13 +68,23 @@ def compile_request(state, strategy=None):
         raise ValueError('Unknown source strategy')
     inputs = [state['main_image']]
     bindings = []
+    mask_asset_ids = []
     lines = ['Edit IMAGE 1 as the base photograph. Perform all user-directed edits listed below in ONE final photograph.',
              'Preserve unrelated content unless a user requirement explicitly asks to change it.',
              'Each source belongs ONLY to its listed operation. Adapt source objects naturally to target perspective, lighting and occlusion.',
              'Coordinates below are normalized [0,1] regions in the original images, not API control parameters.',
              'Do not reproduce masks, labels, guide outlines or numbered markings in the final image.']
     for m in state['mappings']:
-        src, tgt = m['source'], m['target']
+        src, tgt = m.get('source'), m['target']
+        action = m.get('requirement', '').strip()
+        if not src:
+            target_bbox = store.asset(tgt['mask_id'])['bbox']
+            mask_asset_ids.append(tgt.get('edit_region_id', tgt['mask_id']))
+            lines.append(f'Operation {m["display_index"]}: edit only the selected IMAGE 1 target region {target_bbox}, '
+                         f'near normalized point ({tgt["anchor"]["x"]}, {tgt["anchor"]["y"]}). User requirement: {action}.')
+            bindings.append({'kind': 'main-edit', 'mapping_id': m['id'], 'display_index': m['display_index'],
+                             'target_bbox': target_bbox, 'target_anchor': dict(tgt['anchor']), 'mask_id': mask_asset_ids[-1]})
+            continue
         source_id = src['image_id']
         source_mask = store.asset(src['mask_id'])
         bbox = source_mask['bbox']
@@ -77,7 +102,6 @@ def compile_request(state, strategy=None):
         inputs.append(source_id)
         index = len(inputs)
         target_bbox = store.asset(tgt['mask_id'])['bbox']
-        action = m.get('requirement', '').strip()
         lines.append(f'Operation {m["display_index"]}: use the selected object {src.get("label", "")} from IMAGE {index}, '
                      f'source region {bbox if strategy == "full" else "the central selected object in the crop"}, '
                      f'for the edit around IMAGE 1 target region {target_bbox}, '
@@ -87,6 +111,12 @@ def compile_request(state, strategy=None):
         bindings.append({'kind':'element','mapping_id': m['id'], 'display_index': m['display_index'], 'input_index': index,
                          'original_id': src['image_id'], 'input_asset_id': source_id, 'crop': derived, 'target_bbox': target_bbox,
                          'target_anchor': dict(tgt['anchor'])})
+    for edit in state.get('text_edits', []):
+        original, replacement, bbox = edit['original_text'].strip(), edit['replacement'].strip(), edit['bbox']
+        lines.append(f'Text edit in IMAGE 1 region {bbox}: replace the exact visible text "{original}" with "{replacement}". '
+                     'Match the original typography, perspective, material, lighting and spacing; preserve all other text and pixels as closely as possible.')
+        bindings.append({'kind':'text-edit','text_edit_id':edit['id'],'original_text':original,
+                         'replacement':replacement,'bbox':bbox, **({'polygon': edit['polygon']} if edit.get('polygon') else {})})
     for reference in state.get('full_image_refs', []):
         inputs.append(reference['image_id']);index=len(inputs)
         purpose=reference.get('purpose', '').strip() or 'use as an overall visual reference'
@@ -94,8 +124,8 @@ def compile_request(state, strategy=None):
         bindings.append({'kind':'full-image','reference_id':reference['id'],'input_index':index,'original_id':reference['image_id'],'purpose':purpose})
     if state.get('instructions'):
         lines.append('Additional user requirements: ' + state['instructions'])
-    return dict(prompt='\n'.join(lines), inputs=inputs, bindings=bindings, strategy=strategy,
-                compiler_version=COMPILER_VERSION, model=config.MODEL, mask_mode='disabled-unverified',
+    return dict(prompt='\n'.join(lines), inputs=inputs, bindings=bindings, mask_asset_ids=mask_asset_ids, strategy=strategy,
+                compiler_version=COMPILER_VERSION, model=model, mask_mode='native-openai-alpha' if mask_asset_ids else 'disabled',
                 quality=os.getenv('IMAGE25_QUALITY') or None, size='auto', execution='batch-experimental')
 
 
@@ -181,7 +211,9 @@ def execute(jid):
                      'message': '模拟检查完成：仅验证快照和持久化，未调用 Image2.5，没有生成图片。'})
         return
     try:
-        result = call(job['snapshot']['compiled'])
+        compiled = job['snapshot']['compiled']
+        native_mask = native_edit_mask(compiled.get('mask_asset_ids', []), job['snapshot']['state']['main_image']) if compiled.get('mask_asset_ids') else None
+        result = call(compiled, native_mask) if native_mask is not None else call(compiled)
         # Persist locator before downloading, so retry-save never invokes the model.
         store.update_job(jid, 'saving', result)
         save_outputs(jid)

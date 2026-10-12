@@ -1,4 +1,5 @@
 """Native SlimSAM implementation loaded only inside the isolated worker."""
+import os
 import time
 from collections import OrderedDict
 
@@ -16,7 +17,7 @@ def load(settings):
         import torch as pt
         from transformers import SamModel, SamProcessor
         torch = pt
-        torch.set_num_threads(4)
+        torch.set_num_threads(int(os.getenv("SEGMENTATION_CPU_THREADS", "4")))
         device = 'cuda' if settings['device'] == 'cuda' and torch.cuda.is_available() else 'cpu'
         model = SamModel.from_pretrained(settings['model_dir'], local_files_only=True).to(device).eval()
         processor = SamProcessor.from_pretrained(settings['model_dir'], local_files_only=True)
@@ -68,6 +69,21 @@ def select(aid, x, y, settings, store):
     return dict(candidates=result, elapsed_ms=round((time.perf_counter() - start) * 1000, 2), cached=False)
 
 
+def select_box(aid, box, settings, store):
+    start = time.perf_counter()
+    encoded, original, reshaped = prepare_unlocked(aid, settings, store)
+    width, height = float(reshaped[0, 1]), float(reshaped[0, 0])
+    x1, y1, x2, y2 = box
+    input_box = torch.tensor([[[x1 * width, y1 * height, x2 * width, y2 * height]]], device=model.device)
+    with torch.inference_mode():
+        out = model(image_embeddings=encoded, input_boxes=input_box, multimask_output=False)
+        mask = processor.image_processor.post_process_masks(out.pred_masks.cpu(), original.cpu(), reshaped.cpu())[0][0][0]
+    values = mask.numpy().astype('uint8') * 255
+    score = float(out.iou_scores[0, 0, 0].cpu())
+    return store.mask_asset(Image.fromarray(values), aid, 'slimsam-77-box',
+                            {'score': score, 'box': box, 'elapsed_ms': round((time.perf_counter() - start) * 1000, 2)})
+
+
 def serve(connection, settings):
     # Imports config/store only in this child. DATA_DIR is also passed explicitly so
     # spawn has exactly the parent's data boundary even when tests monkeypatch config.
@@ -84,6 +100,8 @@ def serve(connection, settings):
                 result = prepare(request['image_id'], settings, store)
             elif request['method'] == 'select':
                 result = select(request['image_id'], request['x'], request['y'], settings, store)
+            elif request['method'] == 'box':
+                result = select_box(request['image_id'], request['box'], settings, store)
             else:
                 raise ValueError('unknown SAM operation')
             connection.send({'ok': True, 'result': result})

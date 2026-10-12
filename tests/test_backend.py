@@ -14,7 +14,14 @@ import config
 import store
 import provider
 import segmentation
+import recognition
 from app import app
+
+
+@pytest.fixture(autouse=True)
+def disable_recognition_by_default(monkeypatch):
+    monkeypatch.setattr(config, 'GEMINI_KEY', '')
+    recognition.clear()
 
 
 @pytest.fixture
@@ -121,8 +128,8 @@ def test_simulation_idempotency_does_not_shadow_live_submission(client,monkeypat
     assert simulated['status']=='simulated'
     calls=[]
     monkeypatch.setattr(config,'MODE','live');monkeypatch.setattr(config,'EXPERIMENTAL',True)
-    monkeypatch.setattr(config,'MODEL','image-2.5-live-test')
-    monkeypatch.setattr(provider,'preflight',lambda:{})
+    monkeypatch.setattr(config,'MODEL','gpt-image-2.5-flare')
+    monkeypatch.setattr(provider,'preflight',lambda *args:{})
     monkeypatch.setattr(provider,'call',lambda compiled: calls.append(compiled) or (_ for _ in ()).throw(RuntimeError('injected unknown upstream result')))
     live=submit(client,state,'same-user-action-key')
     assert live['id']!=simulated['id']
@@ -134,8 +141,8 @@ def test_simulation_idempotency_does_not_shadow_live_submission(client,monkeypat
 def test_unknown_live_idempotency_is_never_resubmitted(client,monkeypatch):
     state=ready(client);calls=[]
     monkeypatch.setattr(config,'MODE','live');monkeypatch.setattr(config,'EXPERIMENTAL',True)
-    monkeypatch.setattr(config,'MODEL','image-2.5-live-test')
-    monkeypatch.setattr(provider,'preflight',lambda:{})
+    monkeypatch.setattr(config,'MODEL','gpt-image-2.5-flare')
+    monkeypatch.setattr(provider,'preflight',lambda *args:{})
     monkeypatch.setattr(provider,'call',lambda compiled: calls.append(compiled) or (_ for _ in ()).throw(RuntimeError('injected unknown upstream result')))
     first=submit(client,state,'unknown-paid-action')
     second=submit(client,state,'unknown-paid-action')
@@ -147,8 +154,8 @@ def test_unknown_live_idempotency_is_never_resubmitted(client,monkeypatch):
 def test_legacy_unknown_paid_idempotency_is_preserved(client,monkeypatch):
     state=ready(client);calls=[]
     monkeypatch.setattr(config,'MODE','live');monkeypatch.setattr(config,'EXPERIMENTAL',True)
-    monkeypatch.setattr(config,'MODEL','image-2.5-live-test')
-    monkeypatch.setattr(provider,'preflight',lambda:{})
+    monkeypatch.setattr(config,'MODEL','gpt-image-2.5-flare')
+    monkeypatch.setattr(provider,'preflight',lambda *args:{})
     compiled=provider.compile_request(state)
     snapshot={'state':state,'compiled':compiled,'mode':'live','model':config.MODEL,'created':time.time()}
     jid=store.uid()
@@ -226,7 +233,7 @@ def test_nonoverlap_and_optimistic_lock(client):
 def test_save_retry_expired_url_and_continue(client,monkeypatch):
     state=ready(client);calls=[];downloads=[]
     monkeypatch.setattr(config,'MODE','live');monkeypatch.setattr(config,'EXPERIMENTAL',True)
-    monkeypatch.setattr(provider,'preflight',lambda:{})
+    monkeypatch.setattr(provider,'preflight',lambda *args:{})
     def fake_call(compiled):
         calls.append(compiled);return {'outputs':[{'url':'https://temporary.example/result.png'}],'calls':1,'elapsed_s':.2,'cost_usd':None}
     monkeypatch.setattr(provider,'call',fake_call)
@@ -293,6 +300,33 @@ def test_overlapping_targets_keep_distinct_anchor_intent(client):
     assert compiled['bindings'][0]['target_anchor']=={'x':.2,'y':.2}
     assert compiled['bindings'][1]['target_anchor']=={'x':.25,'y':.25}
     assert '(0.2, 0.2)' in compiled['prompt'] and '(0.25, 0.25)' in compiled['prompt']
+
+
+def test_main_image_mask_edits_compile_in_stable_user_order_without_reference_inputs(client):
+    state=ready(client);state['mappings']=[];state['references']=[]
+    first=mask(client,state['main_image'],.1,.1);second=mask(client,state['main_image'],.5,.5)
+    state['mappings']=[
+        {'id':'local-7','kind':'main-edit','display_index':7,'color':store.COLORS[1],'mode':'replace','requirement':'移除路牌','source':None,
+         'target':{'image_id':state['main_image'],'image_version':1,'mask_id':first['id'],'edit_region_id':first['id'],'anchor':{'x':.2,'y':.2}}},
+        {'id':'local-8','kind':'main-edit','display_index':8,'color':store.COLORS[2],'mode':'replace','requirement':'改成蓝色','source':None,
+         'target':{'image_id':state['main_image'],'image_version':1,'mask_id':second['id'],'edit_region_id':second['id'],'anchor':{'x':.6,'y':.6}}}]
+    state['next_display_index']=9
+    store.validate(state,True,True)
+    compiled=provider.compile_request(state)
+    assert compiled['inputs']==[state['main_image']]
+    assert [b['mapping_id'] for b in compiled['bindings']]==['local-7','local-8']
+    assert compiled['mask_asset_ids']==[first['id'],second['id']]
+    assert compiled['prompt'].index('Operation 7') < compiled['prompt'].index('Operation 8')
+    assert '移除路牌' in compiled['prompt'] and '改成蓝色' in compiled['prompt']
+
+
+def test_native_edit_mask_combines_all_local_regions_with_transparent_edit_pixels(client):
+    state=ready(client);first=mask(client,state['main_image'],.1,.1);second=mask(client,state['main_image'],.6,.5)
+    content=provider.native_edit_mask([first['id'],second['id']],state['main_image'])
+    image=Image.open(io.BytesIO(content)).convert('RGBA')
+    assert image.getpixel((18,12))[3]==0
+    assert image.getpixel((78,48))[3]==0
+    assert image.getpixel((110,70))[3]==255
 
 
 def test_mixed_whole_image_and_element_compile_as_distinct_inputs(client):
@@ -388,3 +422,68 @@ def test_submit_guard_rejects_more_than_12_actual_mixed_references(client):
         store.validate(state,True,True)
     assert getattr(error.value,'status_code',None)==400
     assert '当前共 13 个实际参考输入，最多 12 个' in error.value.detail
+
+
+def test_text_only_edit_validates_compiles_and_restores_without_reference_input(client):
+    state = ready(client); state['mappings'] = []; state['references'] = []; state['full_image_refs'] = []
+    state['text_edits'] = [{'id':'text-main-v1-1','image_id':state['main_image'],'image_version':1,'source':'ocr',
+        'original_text':'DesignKit','replacement':'拾影设计','bbox':[.2,.3,.7,.4]}]
+    store.validate(state, True, True)
+    compiled = provider.compile_request(state)
+    assert compiled['inputs'] == [state['main_image']]
+    assert compiled['bindings'] == [{'kind':'text-edit','text_edit_id':'text-main-v1-1','original_text':'DesignKit',
+        'replacement':'拾影设计','bbox':[.2,.3,.7,.4]}]
+    assert 'DesignKit' in compiled['prompt'] and '拾影设计' in compiled['prompt']
+    assert 'preserve all other text' in compiled['prompt']
+    saved = client.put('/api/drafts/' + state['id'], json=state); assert saved.status_code == 200
+    state['revision'] = saved.json()['revision']
+    job = submit(client, state, 'text-only-history')
+    restored = client.post('/api/jobs/' + job['id'] + '/restore', json={}).json()
+    assert restored['text_edits'] == state['text_edits']
+
+
+def test_text_edit_validation_rejects_wrong_image_empty_or_invalid_bbox(client):
+    state = ready(client); state['mappings'] = []
+    base = {'id':'t1','image_id':'wrong','image_version':1,'source':'ocr','original_text':'旧字','replacement':'新字','bbox':[.1,.2,.3,.4]}
+    for change in ({}, {'image_id':state['main_image'],'replacement':'  '}, {'image_id':state['main_image'],'bbox':[.4,.2,.3,.4]}):
+        state['text_edits'] = [{**base, **change}]
+        with pytest.raises(Exception): store.validate(state)
+
+
+def test_ocr_endpoint_returns_real_adapter_output_without_creating_job(client, monkeypatch):
+    import text_recognition
+    asset = upload(client)
+    expected = {'engine':'rapidocr','items':[{'id':'line-1','text':'DesignKit','confidence':.98,'bbox':[.1,.2,.4,.3]}]}
+    monkeypatch.setattr(text_recognition, 'recognize', lambda aid: expected)
+    before = client.get('/api/jobs').json()['items']
+    response = client.post('/api/text-recognition/' + asset['id'])
+    assert response.status_code == 200 and response.json() == expected
+    assert client.get('/api/jobs').json()['items'] == before
+
+
+def test_generation_model_allowlist_default_snapshot_restore_and_adapter(client, monkeypatch):
+    state = ready(client)
+    assert state.get('generation_model') == 'gpt-image-2.5-flare'
+    state['generation_model'] = 'gpt-image-2.5-sunburst'
+    saved = client.put('/api/drafts/' + state['id'], json=state)
+    assert saved.status_code == 200, saved.text
+    state['revision'] = saved.json()['revision']
+    job = submit(client, state, 'sunburst-model-snapshot')
+    assert job['snapshot']['model'] == 'gpt-image-2.5-sunburst'
+    assert job['snapshot']['compiled']['model'] == 'gpt-image-2.5-sunburst'
+    restored = client.post('/api/jobs/' + job['id'] + '/restore', json={}).json()
+    assert restored['generation_model'] == 'gpt-image-2.5-sunburst'
+    restored['generation_model'] = 'made-up-model'
+    assert client.put('/api/drafts/' + restored['id'], json=restored).status_code == 400
+
+
+def test_live_submit_sends_selected_exact_model_to_provider(client, monkeypatch):
+    state = ready(client); state['generation_model'] = 'gpt-image-2.5-sunburst'
+    saved = client.put('/api/drafts/' + state['id'], json=state); state['revision'] = saved.json()['revision']
+    calls = []
+    monkeypatch.setattr(config, 'MODE', 'live'); monkeypatch.setattr(config, 'EXPERIMENTAL', True)
+    monkeypatch.setattr(provider, 'preflight', lambda model: {})
+    monkeypatch.setattr(provider, 'call', lambda compiled: calls.append(compiled['model']) or (_ for _ in ()).throw(RuntimeError('stub stop')))
+    job = submit(client, state, 'selected-model-provider-stub')
+    assert job['status'] == 'unknown'
+    assert calls == ['gpt-image-2.5-sunburst']

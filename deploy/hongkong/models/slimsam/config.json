@@ -1,0 +1,20 @@
+{
+  "architectures": [
+    "SamModel"
+  ],
+  "initializer_range": 0.02,
+  "mask_decoder_config": {
+    "model_type": ""
+  },
+  "model_type": "sam",
+  "prompt_encoder_config": {
+    "model_type": ""
+  },
+  "torch_dtype": "float32",
+  "transformers_version": "4.37.0.dev0",
+  "vision_config": {
+    "hidden_size": 168,
+    "mlp_dim": 696,
+    "model_type": ""
+  }
+}

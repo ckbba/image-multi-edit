@@ -140,12 +140,15 @@ COLORS = ['#8b5cf6', '#3b82f6', '#f59e0b', '#10b981', '#ec4899']
 REFERENCE_UPLOAD_LIMIT = 12
 MAPPING_DRAFT_LIMIT = 20
 MODEL_REFERENCE_LIMIT = 12
+GENERATION_MODELS = ('gpt-image-2.5-flare', 'gpt-image-2.5-sunburst')
+DEFAULT_GENERATION_MODEL = GENERATION_MODELS[0]
 
 
 def validate(state, for_submit=False, allow_overlap=False):
     mappings = state.get('mappings', [])
     refs = state.get('references', [])
     whole_refs = state.get('full_image_refs', [])
+    text_edits = state.get('text_edits', [])
     if len(refs) > REFERENCE_UPLOAD_LIMIT or len(set(refs)) != len(refs):
         raise HTTPException(400, '最多 12 张参考图，且不能重复添加同一素材')
     if len(mappings) > MAPPING_DRAFT_LIMIT:
@@ -154,6 +157,8 @@ def validate(state, for_submit=False, allow_overlap=False):
         raise HTTPException(400, '项目名或补充要求过长')
     if state.get('source_strategy', 'full') not in ('full', 'context-crop', 'transparent'):
         raise HTTPException(400, '请选择完整参考图或带上下文裁剪')
+    if state.get('generation_model', DEFAULT_GENERATION_MODEL) not in GENERATION_MODELS:
+        raise HTTPException(400, '请选择受支持的生成模型')
     main = state.get('main_image')
     for aid in ([main] if main else []) + refs:
         if asset(aid)['kind'] not in ('image', 'output'):
@@ -165,6 +170,20 @@ def validate(state, for_submit=False, allow_overlap=False):
         whole_ids.add(reference.get('id'))
         if len(reference.get('label', '')) > 80 or len(reference.get('purpose', '')) > 1000:
             raise HTTPException(400, '整图引用名称或用途过长')
+    text_ids = set()
+    for edit in text_edits:
+        bbox = edit.get('bbox')
+        polygon = edit.get('polygon', [])
+        if (not edit.get('id') or edit['id'] in text_ids or edit.get('image_id') != main or edit.get('image_version') != 1
+                or edit.get('source') not in ('ocr', 'user') or not str(edit.get('original_text', '')).strip()
+                or not str(edit.get('replacement', '')).strip() or len(edit.get('original_text', '')) > 200
+                or len(edit.get('replacement', '')) > 200 or not isinstance(bbox, list) or len(bbox) != 4
+                or not all(isinstance(v, (int, float)) and 0 <= v <= 1 for v in bbox)
+                or bbox[0] >= bbox[2] or bbox[1] >= bbox[3]
+                or polygon and not (3 <= len(polygon) <= 12 and all(isinstance(p, list) and len(p) == 2
+                    and all(isinstance(v, (int, float)) and 0 <= v <= 1 for v in p) for p in polygon))):
+            raise HTTPException(400, '改字草稿无效、过长或不属于当前主图')
+        text_ids.add(edit['id'])
     ids, numbers = set(), set()
     masks = []
     for mapping in mappings:
@@ -174,11 +193,15 @@ def validate(state, for_submit=False, allow_overlap=False):
         ids.add(mapping['id']); numbers.add(number)
         if mapping.get('color') != COLORS[(number - 1) % 5]:
             raise HTTPException(400, '关系编号与颜色不一致')
-        if len(mapping['source'].get('label', '')) > 10:
+        kind = mapping.get('kind', 'reference-edit')
+        source = mapping.get('source')
+        if kind not in ('reference-edit', 'main-edit') or (kind == 'main-edit') != (source is None):
+            raise HTTPException(400, '编辑类型与来源不匹配')
+        if source and len(source.get('label', '')) > 10:
             raise HTTPException(400, '物品名称最多 10 字')
         if len(mapping.get('requirement', '')) > 1000:
             raise HTTPException(400, '单条操作要求最多 1000 字')
-        for side in ('source', 'target'):
+        for side in (('target',) if kind == 'main-edit' else ('source', 'target')):
             data = mapping[side]
             expected = refs if side == 'source' else [main]
             if data.get('image_id') not in expected or data.get('image_version') != 1:
@@ -204,8 +227,8 @@ def validate(state, for_submit=False, allow_overlap=False):
                 conflicts.append({'a': a, 'b': b, 'overlap': round(ratio, 4), 'duplicate': ratio > 0.85})
     if state.get('next_display_index', 1) <= max(numbers, default=0):
         raise HTTPException(400, '下个编号必须大于已分配编号')
-    if for_submit and (not main or (not mappings and not whole_refs)):
-        raise HTTPException(400, '请准备主图和至少一条有效编辑关系或整图引用')
+    if for_submit and (not main or (not mappings and not whole_refs and not text_edits)):
+        raise HTTPException(400, '请准备主图和至少一条有效编辑关系、改字或整图引用')
     actual_references = len(mappings) + len(whole_refs)
     if for_submit and actual_references > MODEL_REFERENCE_LIMIT:
         raise HTTPException(400, f'当前共 {actual_references} 个实际参考输入，最多 12 个；请删除部分元素操作或整图引用后再生成')
@@ -219,15 +242,17 @@ def validate(state, for_submit=False, allow_overlap=False):
 
 def new_draft(state=None):
     state = json.loads(json.dumps(state)) if state else dict(schema_version=3, name='未命名编辑', main_image=None,
-        references=[], mappings=[], full_image_refs=[], next_display_index=1, instructions='', source_strategy='context-crop')
+        references=[], mappings=[], text_edits=[], full_image_refs=[], next_display_index=1, instructions='', source_strategy='context-crop')
     state['id'] = uid()
     state['project_id'] = state.get('project_id', uid())
     state['revision'] = 0
     state['schema_version'] = 3
     state.setdefault('references', [])
     state.setdefault('full_image_refs', [])
+    state.setdefault('text_edits', [])
     state.setdefault('instructions', '')
     state.setdefault('source_strategy', 'context-crop')
+    state.setdefault('generation_model', DEFAULT_GENERATION_MODEL)
     state.setdefault('next_display_index', max([m['display_index'] for m in state.get('mappings', [])], default=0) + 1)
     with db() as con:
         con.execute('INSERT INTO drafts VALUES(?,?,?,?)', (state['id'], 0, time.time(), json.dumps(state)))

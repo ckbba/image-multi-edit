@@ -98,6 +98,17 @@ docker run --name shiying --restart unless-stopped \
 
 备份：停止服务后一起复制完整 DATA_DIR，再启动。也可在线使用 SQLite backup API 及一致的资产快照；不可只复制打开中的 sqlite 主文件而丢失 WAL。回退：停止服务，恢复同一批数据库＋assets，保留对应代码版本。当前 schema 初始化是幂等建表；未来字段变更需显式迁移，切勿删除数据库“重新初始化”。
 
+## 本机无痕改字 OCR
+
+无痕改字使用独立本机 RapidOCR/ONNX 进程，不调用图片生成渠道，也不依赖 SAM。首次安装（不修改 Hermes 环境）：
+
+```powershell
+uv venv --python 3.11 D:/image-editor-development/text-ocr-env
+uv pip install --python D:/image-editor-development/text-ocr-env/Scripts/python.exe -r requirements-text-ocr.txt
+```
+
+默认读取上述解释器，也可通过 `TEXT_OCR_PYTHON` 指向其他专用 Python。OCR 返回原图归一化 bbox 与 polygon；低置信度只提示人工核对，不自动纠错。点击「加入编辑」仅保存草稿，只有统一点击生成才提交任务。
+
 ## 检查与实验
 
 ```powershell

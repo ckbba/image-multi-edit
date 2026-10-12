@@ -1,0 +1,20 @@
+{
+  "image": "C:/Users/Lenovo/AppData/Roaming/Hermes/composer-images/image_242fd5.png",
+  "size": [1024, 1280],
+  "engine": "RapidOCR 3.10.0 / ONNX Runtime (local isolated process)",
+  "paid_calls": 0,
+  "major_region_evidence": [
+    {"expected": "ANNA KARINA", "observed": ["ANNA", "KARINA"], "coverage": "完整，拆成两行", "confidence": [0.9999, 0.9999]},
+    {"expected": "JEAN-LUC GODARD", "observed": ["JEAN-LUC", "GODARD"], "coverage": "完整，拆成两行", "confidence": [0.9998, 1.0]},
+    {"expected": "A BOUT DE SOUFFLE", "observed": ["ABOUT DE", "SOUFFLE"], "coverage": "区域检出但首部空格/分词丢失，必须人工核对原文；未自动纠错", "confidence": [0.9413, 0.9991]},
+    {"expected": "COMING SOON", "observed": ["COMING SOON"], "coverage": "完整", "confidence": [0.9678]}
+  ],
+  "accent_evidence": ["présentent", "d'être jeune", "ET DE LIBERTÉ", "QUI A CHANGÉ", "LE CINÉMA", "CAHIERS DU CINÉMA"],
+  "texture_rotation_evidence": "倾斜的大标题返回四点归一化 polygon；不依赖 SAM。破损纸纹背景下大字可检出。",
+  "miss_or_error_evidence": [
+    "A BOUT DE 被识别为 ABOUT DE（错分词/漏空格）；UI保留原始输出并允许用户修正。",
+    "引号区首行被识别为 \"LF FILM，疑似应为 LE FILM；系统不猜不可读字符。",
+    "海报中报纸级微字没有形成可靠识别行，属于漏识；本回归不宣称覆盖不可读微字。"
+  ],
+  "low_confidence_policy": "confidence < 0.8 标 needs_review 并以橙色提示核对，不做自动纠错；本次返回行均高于阈值，但仍保留通用提示。"
+}

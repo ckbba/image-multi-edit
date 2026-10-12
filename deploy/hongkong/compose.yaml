@@ -1,0 +1,47 @@
+name: shiying-hongkong
+services:
+  editor:
+    build:
+      context: ../..
+      dockerfile: deploy/hongkong/Dockerfile
+    image: shiying-editor:hongkong
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      HOST: 0.0.0.0
+      PORT: "8787"
+      DATA_DIR: /data
+      SEGMENTATION_MODEL_DIR: /models/slimsam
+      SEGMENTATION_DEVICE: cpu
+      SEGMENTATION_CPU_THREADS: "1"
+      HF_HOME: /data/cache/huggingface
+      HF_HUB_CACHE: /data/cache/huggingface/hub
+      XDG_CACHE_HOME: /data/cache
+      HF_HUB_OFFLINE: "1"
+      OMP_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+      OMP_WAIT_POLICY: PASSIVE
+      COOKIE_SECURE: "true"
+      # Only the trusted host HTTPS proxy may reach this loopback-bound port.
+      FORWARDED_ALLOW_IPS: "*"
+    ports:
+      - "127.0.0.1:18791:8787"
+    volumes:
+      - data:/data
+      - ./models/slimsam:/models/slimsam:ro
+    cpus: 1.0
+    mem_limit: 2800m
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/api/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+volumes:
+  data: {}

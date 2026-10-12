@@ -1,10 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {imageRect,toImage,createMapping,addMapping,UndoStack,LatestRequest,COLORS,normalizeEditorState,composerEntries,confirmRequirement,cancelRequirementDraft,composerFragmentText,applyComposerFragment,retryTransient,REFERENCE_UPLOAD_LIMIT,MAPPING_DRAFT_LIMIT,MODEL_REFERENCE_LIMIT,generationReferenceCount,assertGenerationReferenceLimit} from '../前端代码/core.js';
+import {imageRect,referenceImageRect,detectedSelectionStatus,toImage,createMapping,createMainEditMapping,createMainEditTransient,commitMainEditTransient,addMapping,removeEmptyDraftMapping,consumePreviewSuppression,SerialActionQueue,UndoStack,LatestRequest,COLORS,normalizeEditorState,composerEntries,confirmRequirement,cancelRequirementDraft,composerFragmentText,applyComposerFragment,retryTransient,REFERENCE_UPLOAD_LIMIT,MAPPING_DRAFT_LIMIT,MODEL_REFERENCE_LIMIT,generationReferenceCount,assertGenerationReferenceLimit,candidateSide,isEditableTarget,imageFilesFromTransfer,dragPreviewSize,createTextEdit,upsertTextEdit,modifiedTextEdits,replaceMainImage} from '../前端代码/core.js';
 
 test('letterbox coordinates remain stable across viewport sizes; margins reject points',()=>{
  for(const [w,h] of [[500,400],[200,700],[1200,500]]){const r=imageRect(w,h,1200,800);const p=toImage(r.x+r.width*.25,r.y+r.height*.75,r);assert.ok(Math.abs(p.x-.25)<1e-10);assert.ok(Math.abs(p.y-.75)<1e-10);assert.equal(toImage(r.x-1,r.y,r),null);}
 });
+test('portrait reference fills available height when its aspect ratio fits and keeps exact coordinates',()=>{for(const [w,h] of [[430,415],[430,560]]){const r=referenceImageRect(w,h,900,1600);assert.ok(Math.abs(r.y)<1e-10);assert.ok(Math.abs(r.height-h)<1e-10);assert.ok(r.width<=w);const p=toImage(r.x+r.width*.37,r.y+r.height*.64,r);assert.ok(Math.abs(p.x-.37)<1e-10);assert.ok(Math.abs(p.y-.64)<1e-10);}});
+test('zoom feedback uses only returned labels and otherwise stays truthful',()=>{assert.equal(detectedSelectionStatus({label:'包',candidates:[{},{}]},0),'包 · 候选 1 / 2 · Tab 切换候选 · 从高亮处拖到主图');assert.equal(detectedSelectionStatus({label:'',candidates:[{}]},0),'选区 · 从高亮处拖到主图');});
 test('deletion, undo and redo preserve IDs, colors and monotonic display number',()=>{
  let s={mappings:[],next_display_index:1};const u=new UndoStack();for(let i=0;i<3;i++)s=addMapping(s,createMapping(s,{image_id:'ref'},{image_id:'main'}));const old=structuredClone(s);u.push(s);s.mappings.splice(1,1);const newMapping=createMapping(s,{},{});assert.equal(newMapping.display_index,4);s=addMapping(s,newMapping);assert.deepEqual(s.mappings.map(m=>m.display_index),[1,3,4]);s=u.undo(s);assert.deepEqual(s,old);s=u.redo(s);assert.equal(s.mappings[1].id,old.mappings[2].id);assert.equal(s.mappings[1].color,COLORS[2]);
 });
@@ -21,6 +23,11 @@ test('legacy state gains mixed-input fields without changing old content',()=>{
  const next=normalizeEditorState(old);
  assert.equal(next.instructions,'保留光线');assert.equal(next.mappings[0].requirement,'');assert.deepEqual(next.full_image_refs,[]);
  assert.notEqual(next,old);
+});
+
+test('legacy drafts default to flare while supported model selection is preserved',()=>{
+ assert.equal(normalizeEditorState({}).generation_model,'gpt-image-2.5-flare');
+ assert.equal(normalizeEditorState({generation_model:'gpt-image-2.5-sunburst'}).generation_model,'gpt-image-2.5-sunburst');
 });
 
 test('composer exposes one structured entry per operation and explicit whole-image reference',()=>{
@@ -58,4 +65,102 @@ test('generation reference guard counts mixed element and whole-image inputs but
  assert.doesNotThrow(()=>assertGenerationReferenceLimit(state));
  state.full_image_refs.push({id:'whole-2'});
  assert.throws(()=>assertGenerationReferenceLimit(state),/当前共 13 个实际参考输入，最多 12 个/);
+});
+
+test('candidate cycling follows canvas context and main wins while source is dragged',()=>{
+ assert.equal(candidateSide({activeSide:'main',mainSelected:true,referenceSelected:true}),'main');
+ assert.equal(candidateSide({activeSide:'reference',mainSelected:true,referenceSelected:true}),'reference');
+ assert.equal(candidateSide({activeSide:'reference',draggingSource:true,mainSelected:true,referenceSelected:true}),'main');
+ assert.equal(candidateSide({activeSide:null,mainSelected:false,referenceSelected:true}),'reference');
+});
+
+test('editable targets keep native Tab behavior including contenteditable descendants',()=>{
+ assert.equal(isEditableTarget({tagName:'TEXTAREA',isContentEditable:false,closest:()=>null}),true);
+ assert.equal(isEditableTarget({tagName:'SPAN',isContentEditable:false,closest:s=>s==='[contenteditable="true"]'?{}:null}),true);
+ assert.equal(isEditableTarget({tagName:'CANVAS',isContentEditable:false,closest:()=>null}),false);
+});
+
+test('clipboard and drop extraction accepts only supported image bytes and deduplicates files',()=>{
+ const png={name:'a.png',type:'image/png',size:10,lastModified:1},jpeg={name:'b.jpg',type:'image/jpeg',size:11,lastModified:2},gif={name:'c.gif',type:'image/gif',size:12,lastModified:3};
+ const transfer={files:[png,jpeg,gif],items:[{kind:'file',getAsFile:()=>png},{kind:'string',type:'text/plain',getAsFile:()=>null}]};
+ assert.deepEqual(imageFilesFromTransfer(transfer),[png,jpeg]);
+ assert.deepEqual(imageFilesFromTransfer({files:[],items:[{kind:'string',type:'text/uri-list',getAsFile:()=>null}]}),[]);
+});
+
+test('masked drag preview preserves crop aspect ratio within its bounds',()=>{
+ assert.deepEqual(dragPreviewSize([.1,.2,.9,.6],1000,500,120,96),{width:120,height:30});
+ assert.deepEqual(dragPreviewSize([.2,.1,.4,.9],500,1000,120,96),{width:12,height:96});
+});
+
+test('main hover selection stays transient until non-empty text is confirmed',()=>{
+ const state={mappings:[],next_display_index:4};
+ const target={image_id:'main',image_version:1,mask_id:'mask',edit_region_id:'mask',anchor:{x:.4,y:.6}};
+ const transient=createMainEditTransient(target,'recognized');
+ assert.equal(transient.kind,'main-edit-transient');
+ assert.equal(transient.label,'+');
+ assert.equal(state.mappings.length,0);
+ assert.equal(state.next_display_index,4);
+ assert.deepEqual(commitMainEditTransient(state,transient,'  '),state);
+ const committed=commitMainEditTransient(state,transient,'改成蓝色');
+ assert.equal(committed.mappings.length,1);
+ assert.equal(committed.mappings[0].kind,'main-edit');
+ assert.equal(committed.mappings[0].requirement,'改成蓝色');
+ assert.equal(committed.mappings[0].draft,false);
+ assert.equal(committed.next_display_index,5);
+});
+
+test('main-image mapping remains a local square-bubble edit',()=>{
+ const state={mappings:[],next_display_index:4};
+ const target={image_id:'main',image_version:1,mask_id:'mask',edit_region_id:'mask',anchor:{x:.4,y:.6}};
+ const mapping=createMainEditMapping(state,target,'recognized');
+ assert.equal(mapping.kind,'main-edit');
+ assert.equal(mapping.selection_method,'recognized');
+ assert.equal(mapping.source,null);
+ assert.equal(mapping.display_index,4);
+});
+
+test('main-image selection interaction consumes its click instead of opening preview',()=>{
+ assert.deepEqual(consumePreviewSuppression({suppressNextPreviewClick:true}),{openPreview:false,suppressNextPreviewClick:false});
+ assert.deepEqual(consumePreviewSuppression({suppressNextPreviewClick:false}),{openPreview:true,suppressNextPreviewClick:false});
+});
+
+test('empty unsent local edit is removed while confirmed and reference edits stay',()=>{
+ const local={id:'local',kind:'main-edit',draft:true,requirement:'',display_index:1};
+ const kept={id:'kept',kind:'main-edit',draft:false,requirement:'改成蓝色',display_index:2};
+ const reference={id:'ref',kind:'reference-edit',draft:true,requirement:'',display_index:3};
+ assert.deepEqual(removeEmptyDraftMapping({mappings:[local,kept,reference]},'local').mappings,[kept,reference]);
+ assert.equal(removeEmptyDraftMapping({mappings:[local]},'local','移除').mappings.length,1);
+});
+
+test('serial action queue preserves invocation order across different completion delays',async()=>{
+ const queue=new SerialActionQueue(),events=[];
+ const first=queue.run(async()=>{events.push('first:start');await new Promise(r=>setTimeout(r,20));events.push('first:end');return 1;});
+ const second=queue.run(async()=>{events.push('second:start');events.push('second:end');return 2;});
+ assert.deepEqual(await Promise.all([first,second]),[1,2]);
+ assert.deepEqual(events,['first:start','first:end','second:start','second:end']);
+});
+
+test('recognized text edits have stable identity and duplicate regions update instead of append',()=>{
+ const detected={id:'ocr-7',text:'DesignKit',bbox:[.2,.3,.6,.4],confidence:.94};
+ const first=createTextEdit('main',1,detected,'新品牌');
+ assert.deepEqual({id:first.id,image_id:first.image_id,image_version:first.image_version,source:first.source,original_text:first.original_text,replacement:first.replacement,bbox:first.bbox},{id:'text:main:1:ocr-7',image_id:'main',image_version:1,source:'ocr',original_text:'DesignKit',replacement:'新品牌',bbox:[.2,.3,.6,.4]});
+ let state=upsertTextEdit(normalizeEditorState({main_image:'main'}),first);
+ state=upsertTextEdit(state,{...first,replacement:'DesignKit Pro'});
+ assert.equal(state.text_edits.length,1);
+ assert.equal(state.text_edits[0].replacement,'DesignKit Pro');
+ assert.deepEqual(modifiedTextEdits({...state,text_edits:[...state.text_edits,{...first,id:'empty',replacement:'  '}]}),state.text_edits);
+});
+
+test('text edits appear in unified composer but do not count as image references',()=>{
+ const state=normalizeEditorState({main_image:'main',text_edits:[{id:'t1',image_id:'main',image_version:1,source:'ocr',original_text:'旧字',replacement:'新字',bbox:[.1,.2,.3,.4]}]});
+ assert.equal(generationReferenceCount(state),0);
+ assert.deepEqual(composerEntries(state).map(x=>[x.kind,x.id,x.text]),[['text-edit','t1','旧字 → 新字'],['global','global','']]);
+});
+
+test('changing the main image clears text edits while unrelated reset paths can preserve snapshots',()=>{
+ const old=normalizeEditorState({main_image:'old',mappings:[{id:'m'}],text_edits:[{id:'t'}]});
+ const next=replaceMainImage(old,'new');
+ assert.equal(next.main_image,'new');
+ assert.deepEqual(next.mappings,[]);
+ assert.deepEqual(next.text_edits,[]);
 });
