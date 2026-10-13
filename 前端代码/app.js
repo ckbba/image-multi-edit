@@ -1,5 +1,5 @@
 import {COLORS,clone,imageRect,referenceImageRect,toImage,createMapping,createMainEditTransient,commitMainEditTransient,consumePreviewSuppression,addMapping,UndoStack,LatestRequest,normalizeEditorState,applyRecognizedLabel,mappingLabelTarget,composerMappingToken,mappingPreviewAssets,mappingPreviewKey,historyFrozenMappingInput,workspaceAssetPreviewEntries,historyFrozenAssetEntries,historySelectedPreviewAssets,historyDayKey,historyDayLabel,mergeHistoryItems,updateMappingLabel,applyComposerFragment,retryTransient,REFERENCE_UPLOAD_LIMIT,MAPPING_DRAFT_LIMIT,MODEL_REFERENCE_LIMIT,generationReferenceCount,assertGenerationReferenceLimit,candidateSide,isEditableTarget,imageFilesFromTransfer,paintMaskedDragPreview,createTextEdit,createGroupedTextEdit,textEditViewerTarget,selectTextLinesInPolygon,upsertTextEdit,modifiedTextEdits,replaceMainImage,findTextRegion,mergeTypedCandidates,nextTypedCandidate} from './core.js';
-import {openPreview} from './viewer.js?v=ocr-interaction-fix-5';
+import {openPreview} from './viewer.js?v=text-region-review-6';
 import {mountTour,stopTour} from './tour.js';
 
 const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
