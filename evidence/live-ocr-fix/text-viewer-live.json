@@ -1,0 +1,80 @@
+{
+  "classes": "image-viewer minimal-viewer text-edit-viewer",
+  "toolbarText": "选择文字\n✦ 圈选多行\n−\n复位\n＋\n关闭 ×\n悬停查看识别区域 · 点击文字编辑",
+  "hiddenChrome": [
+    "none",
+    "none",
+    "none",
+    "none"
+  ],
+  "stageBackground": "rgba(0, 0, 0, 0)",
+  "dialogBackground": "rgba(0, 0, 0, 0)",
+  "canvas": {
+    "width": 1024,
+    "height": 1280,
+    "assetId": "43327150c5734849823ab61d90b0871b",
+    "scale": "0.87890625"
+  },
+  "textItemCount": 1,
+  "toolButtons": [
+    {
+      "id": "text-select",
+      "text": "选择文字",
+      "visible": true
+    },
+    {
+      "id": "text-brush",
+      "text": "✦ 圈选多行",
+      "visible": true
+    },
+    {
+      "id": "text-out",
+      "text": "−",
+      "visible": true
+    },
+    {
+      "id": "text-fit",
+      "text": "复位",
+      "visible": true
+    },
+    {
+      "id": "text-in",
+      "text": "＋",
+      "visible": true
+    },
+    {
+      "id": "text-close",
+      "text": "关闭 ×",
+      "visible": true
+    }
+  ],
+  "viewport": {
+    "width": 1800,
+    "height": 1125,
+    "devicePixelRatio": 1
+  },
+  "samplePixel": [
+    17,
+    21,
+    22,
+    255
+  ],
+  "hoverStatus": "ANNA · 点击编辑",
+  "brushStatus": "按住圈选多行文字 · 松开完成 · Esc 取消",
+  "groupedOriginal": "ANNA\nKARINA\nJEAN-LUC\ndans un film de\nGODARD",
+  "console": [],
+  "pageErrors": [],
+  "requestFailures": [],
+  "ocrResponses": [
+    {
+      "url": "http://127.0.0.1:8791/api/text-recognition/43327150c5734849823ab61d90b0871b",
+      "status": 200
+    }
+  ],
+  "draftUnchanged": true,
+  "jobsUnchanged": true,
+  "screenshots": [
+    "evidence\\live-ocr-fix\\text-viewer-live.png",
+    "evidence\\live-ocr-fix\\text-viewer-brush-live.png"
+  ]
+}

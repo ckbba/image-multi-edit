@@ -82,7 +82,7 @@ export function openPreview(items, initial=0, marked=false, options={}){
   }
   if(options.textEdit){
     dialog.classList.add('minimal-viewer','text-edit-viewer');
-    const tools=document.createElement('div');tools.className='magic-tools text-tools';tools.innerHTML='<button id="text-select" class="active">选文字</button><button id="text-brush" aria-pressed="false">✦ 圈选多行</button><button id="text-out" aria-label="缩小图片">−</button><button id="text-fit">复位</button><button id="text-in" aria-label="放大图片">＋</button><button id="text-close">关闭 ×</button><span class="magic-status" role="status">悬停查看识别区域 · 点击文字编辑</span>';dialog.append(tools);
+    const tools=document.createElement('div');tools.className='magic-tools text-tools';tools.innerHTML='<button id="text-select" class="active">选择文字</button><button id="text-brush" aria-pressed="false">✦ 圈选多行</button><button id="text-out" aria-label="缩小图片">−</button><button id="text-fit">复位</button><button id="text-in" aria-label="放大图片">＋</button><button id="text-close">关闭 ×</button><span class="magic-status" role="status">悬停查看识别区域 · 点击文字编辑</span>';dialog.append(tools);
     const brush=tools.querySelector('#text-brush'),status=tools.querySelector('[role="status"]');let drawing=false,points=null,pointerId=null,down=null;
     const position=event=>{const b=stage.getBoundingClientRect();return [(event.clientX-b.left-x)/scale/im.width,(event.clientY-b.top-y)/scale/im.height];};
     const trace=()=>{paint();if(!points?.length)return;ctx.strokeStyle='#b7fa73';ctx.lineWidth=2/scale;ctx.lineJoin='round';ctx.lineCap='round';ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p[0]*im.width,p[1]*im.height):ctx.moveTo(p[0]*im.width,p[1]*im.height));ctx.stroke();};
