@@ -262,6 +262,63 @@ def test_save_retry_expired_url_and_continue(client,monkeypatch):
     assert client.get('/api/assets/'+aid).content==data.getvalue()
 
 
+def test_history_rename_persists_without_mutating_generation_snapshot(client):
+    state = ready(client); job = submit(client, state, 'rename-history')
+    original_snapshot = copy.deepcopy(job['snapshot'])
+    renamed = '8794 重命名样例'
+
+    response = client.patch('/api/jobs/' + job['id'], json={'name': renamed})
+    assert response.status_code == 200, response.text
+    assert response.json()['name'] == renamed
+    reread = client.get('/api/jobs/' + job['id']).json()
+    assert reread['name'] == renamed
+    assert reread['snapshot'] == original_snapshot
+    assert reread['snapshot']['state']['name'] == '测试项目'
+    restored = client.post('/api/jobs/' + job['id'] + '/restore', json={}).json()
+    assert restored['name'] == '测试项目 · 恢复'
+    assert reread['result']['calls'] == 0
+    assert response.headers['cache-control'] == 'no-store'
+    assert client.get('/api/jobs?q=8794').json()['items'][0]['id'] == job['id']
+    assert client.get('/api/jobs?q=测试项目').json()['items'] == []
+
+
+def test_history_rename_validation_and_deleted_scope(client):
+    state = ready(client); job = submit(client, state, 'rename-validation')
+    assert client.patch('/api/jobs/' + job['id'], json={'name': '   '}).status_code == 400
+    assert client.patch('/api/jobs/' + job['id'], json={'name': 'x' * 101}).status_code == 400
+    assert client.patch('/api/jobs/' + job['id'], json={}).status_code == 400
+    assert client.get('/api/jobs/' + job['id']).json()['name'] == '测试项目'
+    assert client.delete('/api/jobs/' + job['id']).status_code == 200
+    assert client.patch('/api/jobs/' + job['id'], json={'name': '不能改'}).status_code == 404
+
+
+def test_history_server_search_status_pagination_and_literal_wildcards(client):
+    state = ready(client)
+    jobs = []
+    for index in range(23):
+        item = submit(client, state, f'search-page-{index:02d}')
+        name = f'跨页中文-{index:02d}' if index in (0, 22) else f'普通-{index:02d}'
+        assert client.patch('/api/jobs/' + item['id'], json={'name': name}).status_code == 200
+        jobs.append(item)
+    assert client.patch('/api/jobs/' + jobs[10]['id'], json={'name': '百分号%下划线_'}).status_code == 200
+    with store.db() as con:
+        con.execute("UPDATE jobs SET status='failed' WHERE id=?", (jobs[22]['id'],))
+        con.execute("UPDATE jobs SET created=? WHERE id=?", (jobs[0]['created'], jobs[1]['id']))
+
+    first = client.get('/api/jobs?q=跨页中文').json()
+    assert first['count'] == 2 and first['next_offset'] is None
+    assert {item['id'] for item in first['items']} == {jobs[0]['id'], jobs[22]['id']}
+    filtered = client.get('/api/jobs?q=跨页中文&status=failed').json()
+    assert filtered['count'] == 1 and filtered['items'][0]['id'] == jobs[22]['id']
+    assert client.get('/api/jobs?q=%').json()['items'][0]['id'] == jobs[10]['id']
+    assert client.get('/api/jobs?q=_').json()['items'][0]['id'] == jobs[10]['id']
+    all_first = client.get('/api/jobs').json()
+    all_second = client.get('/api/jobs?offset=20').json()
+    assert all_first['count'] == 23 and len(all_first['items']) == 20 and all_first['next_offset'] == 20
+    assert len(all_second['items']) == 3 and all_second['count'] == 23 and all_second['next_offset'] is None
+    assert not ({item['id'] for item in all_first['items']} & {item['id'] for item in all_second['items']})
+
+
 def test_delete_keeps_shared_assets_other_history_and_refuses_active_jobs(client):
     state=ready(client);deleted=submit(client,state,'delete-one')
     restored=client.post('/api/jobs/'+deleted['id']+'/restore',json={}).json()

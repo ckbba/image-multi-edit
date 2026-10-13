@@ -45,6 +45,14 @@ app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None
 
 
 @app.middleware('http')
+async def disable_job_caching(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith('/api/jobs'):
+        response.headers['Cache-Control'] = 'no-store'
+    return response
+
+
+@app.middleware('http')
 async def security(request, call_next):
     path = request.url.path
     if request.method not in ('GET', 'HEAD', 'OPTIONS'):
@@ -302,25 +310,47 @@ def public_job(data):
     # Signed upstream URLs/base64 are server recovery data, not browser history dependencies.
     result = data['result'].copy()
     result.pop('outputs', None)
-    return {**data, 'result': result}
+    original_name = data['snapshot']['state']['name']
+    return {**data, 'name': data.get('display_name') or original_name, 'result': result}
 
 
 @app.get('/api/jobs')
-def history(status: str = 'all', offset: int = 0):
+def history(status: str = 'all', offset: int = 0, q: str = ''):
     offset = max(0, offset)
+    keyword = q.strip()
     with store.db() as con:
-        query = 'SELECT id FROM jobs WHERE deleted=0'
+        where = ['deleted=0']
         params = []
         if status != 'all':
-            query += ' AND status=?'; params.append(status)
-        query += ' ORDER BY created DESC LIMIT 20 OFFSET ?'; params.append(offset)
-        rows = con.execute(query, params).fetchall()
+            where.append('status=?'); params.append(status)
+        if keyword:
+            escaped = keyword.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+            where.append("COALESCE(display_name, json_extract(snapshot, '$.state.name')) LIKE ? ESCAPE '\\'")
+            params.append(f'%{escaped}%')
+        clause = ' AND '.join(where)
+        count = con.execute(f'SELECT COUNT(*) FROM jobs WHERE {clause}', params).fetchone()[0]
+        rows = con.execute(f'SELECT id FROM jobs WHERE {clause} ORDER BY created DESC, id DESC LIMIT 20 OFFSET ?', [*params, offset]).fetchall()
     result = []
     for row in rows:
         item = public_job(store.job(row['id']))
         state = item['snapshot']['state']
-        result.append({k: item[k] for k in ('id', 'created', 'status', 'result')} | {'name': state['name'], 'main_image': state['main_image'], 'count': len(state.get('mappings', [])) + len(state.get('text_edits', [])) + len(state.get('full_image_refs', []))})
-    return {'items': result, 'next_offset': offset + 20 if len(result) == 20 else None}
+        result.append({k: item[k] for k in ('id', 'created', 'status', 'result', 'name')} | {'main_image': state['main_image'], 'count': len(state.get('mappings', [])) + len(state.get('text_edits', [])) + len(state.get('full_image_refs', []))})
+    next_offset = offset + len(result) if offset + len(result) < count else None
+    return {'items': result, 'count': count, 'next_offset': next_offset}
+
+
+@app.patch('/api/jobs/{jid}')
+async def rename_history(jid: str, request: Request):
+    job = store.job(jid)
+    body = await request.json()
+    if set(body) != {'name'} or not isinstance(body.get('name'), str):
+        raise HTTPException(400, '请提供历史名称')
+    name = body['name'].strip()
+    if not name or len(name) > 100:
+        raise HTTPException(400, '历史名称需为 1 到 100 个字符')
+    with store.db() as con:
+        con.execute('UPDATE jobs SET display_name=? WHERE id=? AND deleted=0', (name, jid))
+    return public_job(store.job(jid))
 
 
 @app.get('/api/jobs/{jid}')

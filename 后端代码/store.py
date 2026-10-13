@@ -35,9 +35,13 @@ def init():
         CREATE TABLE IF NOT EXISTS assets(id TEXT PRIMARY KEY, meta TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS drafts(id TEXT PRIMARY KEY, revision INTEGER NOT NULL, updated REAL NOT NULL, state TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS jobs(id TEXT PRIMARY KEY, idem TEXT UNIQUE NOT NULL, created REAL NOT NULL,
-          status TEXT NOT NULL, snapshot TEXT NOT NULL, result TEXT NOT NULL DEFAULT '{}', deleted INTEGER NOT NULL DEFAULT 0);
+          status TEXT NOT NULL, snapshot TEXT NOT NULL, result TEXT NOT NULL DEFAULT '{}', deleted INTEGER NOT NULL DEFAULT 0,
+          display_name TEXT);
         CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY, expires REAL NOT NULL);
         ''')
+        columns = {row['name'] for row in con.execute('PRAGMA table_info(jobs)')}
+        if 'display_name' not in columns:
+            con.execute('ALTER TABLE jobs ADD COLUMN display_name TEXT')
         con.execute("UPDATE jobs SET status='unknown', result=json_set(result,'$.error','服务重启中断请求；上游状态未知，不自动重复扣费。') WHERE status='running'")
 
 
