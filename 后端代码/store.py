@@ -194,14 +194,18 @@ def validate(state, for_submit=False, allow_overlap=False):
         bbox = edit.get('bbox')
         polygon = edit.get('polygon', [])
         if (not edit.get('id') or edit['id'] in text_ids or edit.get('image_id') != main or edit.get('image_version') != 1
-                or edit.get('source') not in ('ocr', 'user') or not str(edit.get('original_text', '')).strip()
-                or not str(edit.get('replacement', '')).strip() or len(edit.get('original_text', '')) > 200
-                or len(edit.get('replacement', '')) > 200 or not isinstance(bbox, list) or len(bbox) != 4
+                or edit.get('source') not in ('ocr', 'ocr-group', 'user') or not str(edit.get('original_text', '')).strip()
+                or not str(edit.get('replacement', '')).strip() or len(edit.get('original_text', '')) > (2000 if edit.get('source') == 'ocr-group' else 200)
+                or len(edit.get('replacement', '')) > (2000 if edit.get('source') == 'ocr-group' else 200) or not isinstance(bbox, list) or len(bbox) != 4
                 or not all(isinstance(v, (int, float)) and 0 <= v <= 1 for v in bbox)
                 or bbox[0] >= bbox[2] or bbox[1] >= bbox[3]
-                or polygon and not (3 <= len(polygon) <= 12 and all(isinstance(p, list) and len(p) == 2
+                or polygon and not (3 <= len(polygon) <= 500 and all(isinstance(p, list) and len(p) == 2
                     and all(isinstance(v, (int, float)) and 0 <= v <= 1 for v in p) for p in polygon))):
             raise HTTPException(400, '改字草稿无效、过长或不属于当前主图')
+        line_ids = edit.get('ocr_line_ids', [])
+        if (line_ids and (edit.get('source') != 'ocr-group' or not isinstance(line_ids, list) or len(line_ids) > 80
+                          or len(set(line_ids)) != len(line_ids) or not all(isinstance(v, str) and 0 < len(v) <= 80 for v in line_ids))):
+            raise HTTPException(400, '组合改字的识别行无效')
         text_ids.add(edit['id'])
     ids, numbers = set(), set()
     masks = []

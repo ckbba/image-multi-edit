@@ -571,6 +571,19 @@ def test_compile_filters_noop_text_edits_and_never_leaks_unmodified_ocr_text(cli
         store.validate({**state, 'text_edits':[sentinel]}, True, True)
 
 
+def test_grouped_text_region_validates_and_compiles_as_one_binding_with_linebreaks(client):
+    state = ready(client); state['mappings'] = []; state['references'] = []; state['full_image_refs'] = []
+    state['text_edits'] = [{'id':'text-group-main-anna-karina','image_id':state['main_image'],'image_version':1,
+        'source':'ocr-group','original_text':'ANNA\nKARINA','replacement':'安娜\n卡里娜','bbox':[.1,.2,.5,.4],
+        'polygon':[[.08,.18],[.52,.18],[.52,.42],[.08,.42]],'ocr_line_ids':['line-anna','line-karina']}]
+    store.validate(state, True, True)
+    compiled = provider.compile_request(state)
+    assert len(compiled['bindings']) == 1
+    assert compiled['bindings'][0]['ocr_line_ids'] == ['line-anna','line-karina']
+    assert compiled['bindings'][0]['polygon'] == state['text_edits'][0]['polygon']
+    assert 'ANNA\nKARINA' in compiled['prompt'] and '安娜\n卡里娜' in compiled['prompt']
+
+
 def test_text_edit_validation_rejects_wrong_image_empty_or_invalid_bbox(client):
     state = ready(client); state['mappings'] = []
     base = {'id':'t1','image_id':'wrong','image_version':1,'source':'ocr','original_text':'旧字','replacement':'新字','bbox':[.1,.2,.3,.4]}

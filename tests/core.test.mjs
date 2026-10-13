@@ -1,9 +1,28 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {imageRect,referenceImageRect,detectedSelectionStatus,toImage,createMapping,createMainEditMapping,createMainEditTransient,commitMainEditTransient,addMapping,removeEmptyDraftMapping,consumePreviewSuppression,SerialActionQueue,UndoStack,LatestRequest,COLORS,normalizeEditorState,applyRecognizedLabel,composerMappingToken,mappingPreviewAssets,mappingPreviewKey,historyFrozenMappingInput,historySelectedPreviewAssets,historyDayKey,historyDayLabel,mergeHistoryItems,updateMappingLabel,composerEntries,confirmRequirement,cancelRequirementDraft,composerFragmentText,applyComposerFragment,retryTransient,REFERENCE_UPLOAD_LIMIT,MAPPING_DRAFT_LIMIT,MODEL_REFERENCE_LIMIT,generationReferenceCount,assertGenerationReferenceLimit,candidateSide,isEditableTarget,imageFilesFromTransfer,dragPreviewSize,createTextEdit,upsertTextEdit,modifiedTextEdits,replaceMainImage,findTextRegion,mergeTypedCandidates,nextTypedCandidate,isEffectiveTextEdit} from '../前端代码/core.js';
+import {imageRect,referenceImageRect,detectedSelectionStatus,toImage,createMapping,createMainEditMapping,createMainEditTransient,commitMainEditTransient,addMapping,removeEmptyDraftMapping,consumePreviewSuppression,SerialActionQueue,UndoStack,LatestRequest,COLORS,normalizeEditorState,applyRecognizedLabel,composerMappingToken,mappingPreviewAssets,mappingPreviewKey,historyFrozenMappingInput,historySelectedPreviewAssets,historyDayKey,historyDayLabel,mergeHistoryItems,updateMappingLabel,composerEntries,confirmRequirement,cancelRequirementDraft,composerFragmentText,applyComposerFragment,retryTransient,REFERENCE_UPLOAD_LIMIT,MAPPING_DRAFT_LIMIT,MODEL_REFERENCE_LIMIT,generationReferenceCount,assertGenerationReferenceLimit,candidateSide,isEditableTarget,imageFilesFromTransfer,dragPreviewSize,createTextEdit,createGroupedTextEdit,selectTextLinesInPolygon,upsertTextEdit,modifiedTextEdits,replaceMainImage,findTextRegion,mergeTypedCandidates,nextTypedCandidate,isEffectiveTextEdit} from '../前端代码/core.js';
 
 test('letterbox coordinates remain stable across viewport sizes; margins reject points',()=>{
  for(const [w,h] of [[500,400],[200,700],[1200,500]]){const r=imageRect(w,h,1200,800);const p=toImage(r.x+r.width*.25,r.y+r.height*.75,r);assert.ok(Math.abs(p.x-.25)<1e-10);assert.ok(Math.abs(p.y-.75)<1e-10);assert.equal(toImage(r.x-1,r.y,r),null);}
+});
+test('text brush selects intersecting lines in reading order and group replaces covered pending lines',()=>{
+ const lines=[
+  {id:'b',text:'KARINA',bbox:[.12,.31,.42,.39],polygon:[[.12,.31],[.42,.31],[.42,.39],[.12,.39]],confidence:.99},
+  {id:'outside',text:'SENTINEL',bbox:[.7,.7,.9,.8],polygon:[[.7,.7],[.9,.7],[.9,.8],[.7,.8]]},
+  {id:'a',text:'ANNA',bbox:[.1,.2,.32,.28],polygon:[[.1,.2],[.32,.2],[.32,.28],[.1,.28]],confidence:.98}];
+ const brush=[[.05,.15],[.5,.15],[.5,.45],[.05,.45]];
+ assert.deepEqual(selectTextLinesInPolygon(lines,brush).map(item=>item.id),['a','b']);
+ const grouped=createGroupedTextEdit('main',1,selectTextLinesInPolygon(lines,brush),brush,'安娜\n卡里娜');
+ assert.equal(grouped.original_text,'ANNA\nKARINA');
+ assert.deepEqual(grouped.ocr_line_ids,['a','b']);
+ assert.equal(grouped.source,'ocr-group');
+ let state=normalizeEditorState({main_image:'main',text_edits:[createTextEdit('main',1,lines[0],'old pending'),createTextEdit('main',1,lines[2],'another pending'),{id:'unrelated',image_id:'main',image_version:1,source:'ocr',original_text:'SENTINEL',replacement:'keep',bbox:[.7,.7,.9,.8]}]});
+ state=upsertTextEdit(state,grouped);
+ assert.deepEqual(state.text_edits.map(item=>item.id),['unrelated',grouped.id]);
+ const updated=createGroupedTextEdit('main',1,selectTextLinesInPolygon(lines,brush),brush,'ANNA K.');
+ state=upsertTextEdit(state,updated);
+ assert.deepEqual(state.text_edits.map(item=>item.id),['unrelated',grouped.id]);
+ assert.equal(state.text_edits[1].replacement,'ANNA K.');
 });
 test('portrait reference fills available height when its aspect ratio fits and keeps exact coordinates',()=>{for(const [w,h] of [[430,415],[430,560]]){const r=referenceImageRect(w,h,900,1600);assert.ok(Math.abs(r.y)<1e-10);assert.ok(Math.abs(r.height-h)<1e-10);assert.ok(r.width<=w);const p=toImage(r.x+r.width*.37,r.y+r.height*.64,r);assert.ok(Math.abs(p.x-.37)<1e-10);assert.ok(Math.abs(p.y-.64)<1e-10);}});
 test('zoom feedback uses only returned labels and otherwise stays truthful',()=>{assert.equal(detectedSelectionStatus({label:'包',candidates:[{},{}]},0),'包 · 候选 1 / 2 · Tab 切换候选 · 从高亮处拖到主图');assert.equal(detectedSelectionStatus({label:'',candidates:[{}]},0),'选区 · 从高亮处拖到主图');});

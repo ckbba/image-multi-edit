@@ -1,4 +1,4 @@
-import {paintMaskedDragPreview,detectedSelectionStatus} from './core.js';
+import {paintMaskedDragPreview,detectedSelectionStatus,findTextRegion,selectTextLinesInPolygon} from './core.js';
 // History is read-only; workspace can provide a manual-selection callback.
 export function openPreview(items, initial=0, marked=false, options={}){
   document.querySelector('.image-viewer')?.close();
@@ -6,7 +6,7 @@ export function openPreview(items, initial=0, marked=false, options={}){
   dialog.setAttribute('aria-label','图片预览');
   dialog.innerHTML=`<header class="viewer-head"><strong id="viewer-title"></strong><div class="viewer-tools"><button id="viewer-out" aria-label="缩小图片">−</button><output id="viewer-scale"></output><button id="viewer-in" aria-label="放大图片">＋</button><button id="viewer-fit">适应窗口</button><button id="viewer-close">关闭 ×</button></div></header><div class="viewer-options"><label><input id="viewer-regions" type="checkbox">显示当时编辑区域</label><span id="viewer-note"></span></div><div class="viewer-stage"><canvas aria-label="放大图片画布"></canvas><p class="viewer-loading" role="status">正在加载原图…</p></div><nav class="viewer-gallery" aria-label="切换预览图片"></nav><footer class="viewer-foot">滚轮缩放 · 按住图片拖动 · Esc 关闭</footer>`;
   const find=s=>dialog.querySelector(s),stage=find('.viewer-stage'),canvas=find('canvas'),ctx=canvas.getContext('2d');
-  let index=initial,im=null,regions=[],version=0,scale=1,x=0,y=0,panning=null,regionDrag=null,detected=null,detectTimer=null,detectController=null;
+  let index=initial,im=null,regions=[],version=0,scale=1,x=0,y=0,panning=null,regionDrag=null,detected=null,detectTimer=null,detectController=null,textHover=null;
   const cache=new Map();
   function load(id){if(!cache.has(id))cache.set(id,new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=()=>reject(new Error('图片加载失败，请关闭后重试'));image.src='/api/assets/'+id;}));return cache.get(id);}
   function transform(){
@@ -32,6 +32,7 @@ export function openPreview(items, initial=0, marked=false, options={}){
       if(!region.number){const arm=3/scale;ctx.beginPath();ctx.moveTo(px-arm,py);ctx.lineTo(px+arm,py);ctx.moveTo(px,py-arm);ctx.lineTo(px,py+arm);ctx.stroke();}
       if(region.number){ctx.fillStyle='white';ctx.font=`bold ${Math.round(radius*1.15)}px system-ui`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(String(region.number),px,py);}
     }
+    if(options.textEdit)for(const item of options.textEdit.items||[]){const points=item.polygon?.length?item.polygon:[[item.bbox[0],item.bbox[1]],[item.bbox[2],item.bbox[1]],[item.bbox[2],item.bbox[3]],[item.bbox[0],item.bbox[3]]];ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p[0]*im.width,p[1]*im.height):ctx.moveTo(p[0]*im.width,p[1]*im.height));ctx.closePath();ctx.fillStyle=item===textHover?'#a3e63566':'#8b5cf633';ctx.strokeStyle=item===textHover?'#d9f99d':'#c4b5fd';ctx.lineWidth=(item===textHover?3:1.5)/scale;ctx.fill();ctx.stroke();}
   }
   async function select(next){
     index=next;const token=++version,item=items[index];im=null;regions=[];detected=null;canvas.hidden=true;
@@ -78,6 +79,22 @@ export function openPreview(items, initial=0, marked=false, options={}){
     stage.onpointercancel=()=>{points=null;pointerId=null;panUp();paint();};stage.onpointerleave=()=>cursor.classList.remove('visible');stage.onpointerenter=()=>cursor.classList.add('visible');
     stage.addEventListener('wheel',()=>{if(points){points=null;pointerId=null;paint();status.textContent='缩放后请重新圈画';}},{passive:true});
     dialog.addEventListener('cancel',event=>{if(points){event.preventDefault();points=null;pointerId=null;paint();status.textContent='已取消本次圈画';}});
+  }
+  if(options.textEdit){
+    dialog.classList.add('minimal-viewer','text-edit-viewer');
+    const tools=document.createElement('div');tools.className='magic-tools text-tools';tools.innerHTML='<button id="text-select" class="active">选文字</button><button id="text-brush" aria-pressed="false">✦ 圈选多行</button><button id="text-out" aria-label="缩小图片">−</button><button id="text-fit">复位</button><button id="text-in" aria-label="放大图片">＋</button><button id="text-close">关闭 ×</button><span class="magic-status" role="status">悬停查看识别区域 · 点击文字编辑</span>';dialog.append(tools);
+    const brush=tools.querySelector('#text-brush'),status=tools.querySelector('[role="status"]');let drawing=false,points=null,pointerId=null,down=null;
+    const position=event=>{const b=stage.getBoundingClientRect();return [(event.clientX-b.left-x)/scale/im.width,(event.clientY-b.top-y)/scale/im.height];};
+    const trace=()=>{paint();if(!points?.length)return;ctx.strokeStyle='#b7fa73';ctx.lineWidth=2/scale;ctx.lineJoin='round';ctx.lineCap='round';ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p[0]*im.width,p[1]*im.height):ctx.moveTo(p[0]*im.width,p[1]*im.height));ctx.stroke();};
+    brush.onclick=()=>{drawing=!drawing;points=null;paint();brush.setAttribute('aria-pressed',String(drawing));brush.classList.toggle('active',drawing);tools.querySelector('#text-select').classList.toggle('active',!drawing);stage.classList.toggle('magic-drawing',drawing);status.textContent=drawing?'按住圈选多行文字 · 松开完成 · Esc 取消':'悬停查看识别区域 · 点击文字编辑';};
+    tools.querySelector('#text-select').onclick=()=>{if(drawing)brush.click();};tools.querySelector('#text-in').onclick=()=>zoom(1.25);tools.querySelector('#text-out').onclick=()=>zoom(.8);tools.querySelector('#text-fit').onclick=fit;tools.querySelector('#text-close').onclick=()=>dialog.close();
+    const panDown=stage.onpointerdown,panMove=stage.onpointermove,panUp=stage.onpointerup;
+    stage.onpointerdown=event=>{if(!drawing){down={x:event.clientX,y:event.clientY};panDown(event);return;}if(event.button!==0||!im)return;const p=position(event);if(p.some(v=>v<0||v>1))return;event.preventDefault();pointerId=event.pointerId;points=[p];stage.setPointerCapture(pointerId);};
+    stage.onpointermove=event=>{if(!drawing){panMove(event);if(!im||panning)return;const p=position(event),item=findTextRegion(options.textEdit.items,{x:p[0],y:p[1]});if(item!==textHover){textHover=item;paint();status.textContent=item?`${item.text} · 点击编辑${item.needs_review?' · 请核对原文':''}`:'悬停查看识别区域 · 点击文字编辑';}return;}if(!points||event.pointerId!==pointerId)return;const p=position(event).map(v=>Math.max(0,Math.min(1,v))),last=points.at(-1);if(Math.hypot((p[0]-last[0])*im.width*scale,(p[1]-last[1])*im.height*scale)>2)points.push(p);trace();};
+    const adoptEditor=()=>{const editor=document.querySelector('#text-region-editor');if(editor&&!dialog.contains(editor))dialog.append(editor);};
+    stage.onpointerup=event=>{if(!drawing){const item=textHover,moved=down&&Math.hypot(event.clientX-down.x,event.clientY-down.y)>6;panUp(event);down=null;if(item&&!moved){options.textEdit.onOpen(item,event);adoptEditor();}return;}if(!points||event.pointerId!==pointerId)return;stage.onpointermove(event);const selected=points;points=null;pointerId=null;if(stage.hasPointerCapture(event.pointerId))stage.releasePointerCapture(event.pointerId);if(selected.length<3){paint();status.textContent='请圈出包含文字的区域';return;}const selectedItems=selectTextLinesInPolygon(options.textEdit.items,selected);paint();if(!selectedItems.length){status.textContent='未识别到文字，请调整圈选范围';options.textEdit.onGroup([],selected,event);return;}options.textEdit.onGroup(selectedItems,selected,event);adoptEditor();status.textContent=`已选 ${selectedItems.length} 行 · 核对后点 ✓ 加入编辑`;};
+    stage.onpointercancel=()=>{points=null;pointerId=null;panning=null;paint();};
+    dialog.addEventListener('cancel',event=>{if(document.querySelector('#text-region-editor')){event.preventDefault();document.querySelector('#text-region-editor').remove();return;}if(points||drawing){event.preventDefault();points=null;drawing=false;brush.setAttribute('aria-pressed','false');stage.classList.remove('magic-drawing');paint();status.textContent='已取消圈选 · 点击文字编辑';}});
   }
   const previousFocus=document.activeElement;
   dialog.addEventListener('keydown',async event=>{if(event.key!=='Tab'||!detected?.candidates?.length||event.target.closest('input,textarea,select,[contenteditable="true"]'))return;event.preventDefault();detected.candidateIndex=(detected.candidateIndex+1)%detected.candidates.length;const meta=detected.candidates[detected.candidateIndex],mask=await load(meta.id),tint=document.createElement('canvas');tint.width=mask.width;tint.height=mask.height;const c=tint.getContext('2d');c.drawImage(mask,0,0);c.globalCompositeOperation='source-in';c.fillStyle=detected.color;c.fillRect(0,0,tint.width,tint.height);detected={...detected,mask_id:meta.id,source:{...detected.source,mask_id:meta.id},maskMeta:meta,mask,tint};paint();find('.magic-status').textContent=detectedSelectionStatus(detected,detected.candidateIndex);});

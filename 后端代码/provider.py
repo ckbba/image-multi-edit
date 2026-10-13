@@ -147,7 +147,8 @@ def compile_request(state, strategy=None):
         lines.append(f'Text edit in IMAGE 1 region {bbox}: replace the exact visible text "{original}" with "{replacement}". '
                      'Match the original typography, perspective, material, lighting and spacing; preserve all other text and pixels as closely as possible.')
         bindings.append({'kind':'text-edit','text_edit_id':edit['id'],'original_text':original,
-                         'replacement':replacement,'bbox':bbox, **({'polygon': edit['polygon']} if edit.get('polygon') else {})})
+                         'replacement':replacement,'bbox':bbox, **({'polygon': edit['polygon']} if edit.get('polygon') else {}),
+                         **({'ocr_line_ids': edit['ocr_line_ids']} if edit.get('ocr_line_ids') else {})})
     for reference in state.get('full_image_refs', []):
         inputs.append(reference['image_id']);index=len(inputs)
         purpose=reference.get('purpose', '').strip() or 'use as an overall visual reference'
