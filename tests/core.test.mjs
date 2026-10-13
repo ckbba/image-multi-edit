@@ -1,12 +1,27 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {imageRect,referenceImageRect,detectedSelectionStatus,toImage,createMapping,createMainEditMapping,createMainEditTransient,commitMainEditTransient,addMapping,removeEmptyDraftMapping,consumePreviewSuppression,SerialActionQueue,UndoStack,LatestRequest,COLORS,normalizeEditorState,composerEntries,confirmRequirement,cancelRequirementDraft,composerFragmentText,applyComposerFragment,retryTransient,REFERENCE_UPLOAD_LIMIT,MAPPING_DRAFT_LIMIT,MODEL_REFERENCE_LIMIT,generationReferenceCount,assertGenerationReferenceLimit,candidateSide,isEditableTarget,imageFilesFromTransfer,dragPreviewSize,createTextEdit,upsertTextEdit,modifiedTextEdits,replaceMainImage,findTextRegion,mergeTypedCandidates,nextTypedCandidate,isEffectiveTextEdit} from '../前端代码/core.js';
+import {imageRect,referenceImageRect,detectedSelectionStatus,toImage,createMapping,createMainEditMapping,createMainEditTransient,commitMainEditTransient,addMapping,removeEmptyDraftMapping,consumePreviewSuppression,SerialActionQueue,UndoStack,LatestRequest,COLORS,normalizeEditorState,applyRecognizedLabel,composerMappingToken,mappingPreviewAssets,composerEntries,confirmRequirement,cancelRequirementDraft,composerFragmentText,applyComposerFragment,retryTransient,REFERENCE_UPLOAD_LIMIT,MAPPING_DRAFT_LIMIT,MODEL_REFERENCE_LIMIT,generationReferenceCount,assertGenerationReferenceLimit,candidateSide,isEditableTarget,imageFilesFromTransfer,dragPreviewSize,createTextEdit,upsertTextEdit,modifiedTextEdits,replaceMainImage,findTextRegion,mergeTypedCandidates,nextTypedCandidate,isEffectiveTextEdit} from '../前端代码/core.js';
 
 test('letterbox coordinates remain stable across viewport sizes; margins reject points',()=>{
  for(const [w,h] of [[500,400],[200,700],[1200,500]]){const r=imageRect(w,h,1200,800);const p=toImage(r.x+r.width*.25,r.y+r.height*.75,r);assert.ok(Math.abs(p.x-.25)<1e-10);assert.ok(Math.abs(p.y-.75)<1e-10);assert.equal(toImage(r.x-1,r.y,r),null);}
 });
 test('portrait reference fills available height when its aspect ratio fits and keeps exact coordinates',()=>{for(const [w,h] of [[430,415],[430,560]]){const r=referenceImageRect(w,h,900,1600);assert.ok(Math.abs(r.y)<1e-10);assert.ok(Math.abs(r.height-h)<1e-10);assert.ok(r.width<=w);const p=toImage(r.x+r.width*.37,r.y+r.height*.64,r);assert.ok(Math.abs(p.x-.37)<1e-10);assert.ok(Math.abs(p.y-.64)<1e-10);}});
 test('zoom feedback uses only returned labels and otherwise stays truthful',()=>{assert.equal(detectedSelectionStatus({label:'包',candidates:[{},{}]},0),'包 · 候选 1 / 2 · Tab 切换候选 · 从高亮处拖到主图');assert.equal(detectedSelectionStatus({label:'',candidates:[{}]},0),'选区 · 从高亮处拖到主图');});
+test('cached AI label fills only a blank name and never overwrites a user name',()=>{
+ assert.deepEqual(applyRecognizedLabel({image_id:'ref'},'短发女性'),{image_id:'ref',label:'短发女性',label_source:'ai'});
+ assert.deepEqual(applyRecognizedLabel({image_id:'ref'},''),{image_id:'ref'});
+ assert.deepEqual(applyRecognizedLabel({image_id:'ref',label:'手填名',label_source:'user'},'AI新名'),{image_id:'ref',label:'手填名',label_source:'user'});
+ assert.equal(applyRecognizedLabel({image_id:'ref'},'一二三四五六七八九十十一').label,'一二三四五六七八九十');
+});
+test('composer mapping token uses stable display index and color, with no blank-name fallback',()=>{
+ const named=composerMappingToken({display_index:5,color:'#10b981',source:{image_id:'ref',label:'短发女性'}});
+ assert.deepEqual(named,{displayIndex:5,color:'#10b981',label:'短发女性',imageId:'ref'});
+ assert.equal(composerMappingToken({display_index:8,color:'#ec4899',source:{image_id:'ref',label:''}}).label,'');
+});
+test('mapping hover preview binds the stable mapping to its selected source or main-local mask',()=>{
+ assert.deepEqual(mappingPreviewAssets({id:'source-map',source:{image_id:'ref',mask_id:'source-mask'},target:{image_id:'main',mask_id:'target-mask'}}),{mappingId:'source-map',imageId:'ref',maskId:'source-mask'});
+ assert.deepEqual(mappingPreviewAssets({id:'local-map',source:null,target:{image_id:'main',mask_id:'local-mask'}}),{mappingId:'local-map',imageId:'main',maskId:'local-mask'});
+});
 test('deletion, undo and redo preserve IDs, colors and monotonic display number',()=>{
  let s={mappings:[],next_display_index:1};const u=new UndoStack();for(let i=0;i<3;i++)s=addMapping(s,createMapping(s,{image_id:'ref'},{image_id:'main'}));const old=structuredClone(s);u.push(s);s.mappings.splice(1,1);const newMapping=createMapping(s,{},{});assert.equal(newMapping.display_index,4);s=addMapping(s,newMapping);assert.deepEqual(s.mappings.map(m=>m.display_index),[1,3,4]);s=u.undo(s);assert.deepEqual(s,old);s=u.redo(s);assert.equal(s.mappings[1].id,old.mappings[2].id);assert.equal(s.mappings[1].color,COLORS[2]);
 });

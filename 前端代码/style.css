@@ -73,3 +73,12 @@
 .text-region-editor{width:300px;grid-template-columns:1fr auto}.text-region-editor label{grid-column:1/-1;display:grid;gap:4px;color:#756c80;font-size:11px}.text-region-editor input{width:100%;padding:8px;border:1px solid #e8e3ef;border-radius:8px}.text-region-editor button{grid-column:2;grid-row:4}
 
 .history-composer .history-asset-strip img,.history-composer .composer-token img{pointer-events:auto;cursor:zoom-in}
+
+/* Mapping token: selected crop + stable canvas marker + optional name. */
+.composer-fragment.mapping .mapping-composite-token{height:44px;gap:7px;padding:4px 9px 4px 4px;border-radius:12px}
+.mapping-composite-token .token-image{width:36px;height:34px;flex:0 0 36px}
+.mapping-composite-token .token-image img{width:36px;height:34px}
+.mapping-composite-token .composer-number{display:inline-grid;place-items:center;width:28px;height:28px;flex:0 0 28px;border:2px solid #fff;border-radius:50%;color:#fff;font-size:12px;font-weight:800;line-height:1;box-shadow:0 2px 7px #2b214b45}
+.mapping-composite-token .composer-object-name{max-width:110px;overflow:hidden;text-overflow:ellipsis;color:#6f6680;font-size:12px;font-weight:500;white-space:nowrap}
+.mapping-preview-card{width:238px;background-color:#24202b;background-image:linear-gradient(45deg,#302b38 25%,transparent 25%),linear-gradient(-45deg,#302b38 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#302b38 75%),linear-gradient(-45deg,transparent 75%,#302b38 75%);background-size:14px 14px;background-position:0 0,0 7px,7px -7px,-7px 0}
+.mapping-preview-stage{display:grid;place-items:center;min-height:72px;padding:16px 8px 4px}.mapping-preview-stage canvas{display:block;max-width:220px;max-height:180px}
