@@ -40,14 +40,15 @@ def _recognize_uncached(aid):
         raise HTTPException(503, '本机真实文字识别环境未安装；未使用假识别结果')
     try:
         process = subprocess.run([str(python), str(WORKER), str(image)], capture_output=True,
-                                 text=True, encoding='utf-8', timeout=90, check=False)
+                                 timeout=90, check=False)
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise HTTPException(503, '本机文字识别进程不可用，请稍后重试') from exc
     if process.returncode:
         raise HTTPException(503, '本机文字识别失败，请手动修正或稍后重试')
     try:
-        payload = json.loads(next(line for line in reversed(process.stdout.splitlines()) if line.lstrip().startswith('{')))
-    except (json.JSONDecodeError, StopIteration) as exc:
+        stdout = process.stdout.decode('utf-8')
+        payload = json.loads(next(line for line in reversed(stdout.splitlines()) if line.lstrip().startswith('{')))
+    except (UnicodeDecodeError, json.JSONDecodeError, StopIteration) as exc:
         raise HTTPException(503, '文字识别返回无效') from exc
     items = []
     for raw in payload.get('items', [])[:80]:

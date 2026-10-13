@@ -590,6 +590,22 @@ def test_ocr_endpoint_returns_real_adapter_output_without_creating_job(client, m
     assert client.get('/api/jobs').json()['items'] == before
 
 
+def test_ocr_worker_output_is_read_as_bytes_so_non_utf8_stderr_cannot_discard_valid_json(client, monkeypatch):
+    import subprocess
+    import text_recognition
+    asset = upload(client)
+    payload = json.dumps({'items':[{'text':'呵护健康','confidence':.99,'bbox':[.1,.2,.5,.3]}]}, ensure_ascii=False).encode('utf-8')
+
+    def worker_run(*args, **kwargs):
+        if kwargs.get('text') or kwargs.get('encoding'):
+            raise UnicodeDecodeError('utf-8', b'\xba', 0, 1, 'invalid start byte')
+        return subprocess.CompletedProcess(args[0], 0, stdout=payload + b'\r\n', stderr=b'\xba worker log')
+
+    monkeypatch.setattr(text_recognition.subprocess, 'run', worker_run)
+    result = text_recognition._recognize_uncached(asset['id'])
+    assert result['items'][0]['text'] == '呵护健康'
+
+
 def test_ocr_endpoint_reuses_image_version_cache(client, monkeypatch):
     import text_recognition
     asset = upload(client)
