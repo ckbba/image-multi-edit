@@ -64,14 +64,19 @@ try:
         title=card.locator('.mapping-title-row'); corrections=card.locator('.mapping-corrections')
         boxes=page.evaluate("""() => {const t=document.querySelector('.mapping-title-row>b').getBoundingClientRect(),c=document.querySelector('.mapping-corrections').getBoundingClientRect(),m=document.querySelector('.mapping').getBoundingClientRect();return {titleTop:t.top,controlsTop:c.top,right:c.right,mapRight:m.right,overflow:document.documentElement.scrollWidth>document.documentElement.clientWidth}}""")
         assert abs(boxes['titleTop']-boxes['controlsTop']) < 8 and boxes['right'] <= boxes['mapRight'] and not boxes['overflow'], boxes
+        control=card.locator('.subject-focus-toggle')
+        expect(control).to_contain_text('蒙版效果')
+        control_box=control.bounding_box(); assert control_box and control_box['width'] <= 150 and control_box['height'] <= 32, control_box
+        assert page.evaluate("el=>el.scrollWidth<=el.clientWidth",control.element_handle())
+        boxes['subjectFocusControl']=control_box
         thumb=card.locator('[data-actual-preview]');page.wait_for_timeout(500);thumb=page.locator('[data-actual-preview]').first;thumb.dispatch_event('mouseenter')
         expect(page.locator('.actual-input-preview')).to_be_visible(timeout=10000)
-        expect(page.locator('.actual-input-preview')).to_contain_text('模型参考输入 · 实际裁剪')
+        expect(page.locator('.actual-input-preview')).to_contain_text('模型参考输入 · 蒙版关闭')
         page.screenshot(path=str(OUT/'compact-actual-preview.png'),full_page=True)
         card.locator('[data-label]').fill('奖杯');card.locator('[data-label]').press('Tab')
         expect(page.locator('#toast')).to_contain_text('未定位到新区域')
         card=page.locator('.mapping').first;card.locator('[data-subject-focus]').check()
-        page.locator('[data-actual-preview]').first.dispatch_event('mouseenter');expect(page.locator('.actual-input-preview')).to_contain_text('已突出选中主体')
+        page.locator('[data-actual-preview]').first.dispatch_event('mouseenter');expect(page.locator('.actual-input-preview')).to_contain_text('模型参考输入 · 蒙版效果')
         page.screenshot(path=str(OUT/'subject-focus-preview.png'),full_page=True)
         browser.close()
 
