@@ -130,7 +130,7 @@ def compile_request(state, strategy=None):
 
 
 def call(compiled, native_mask=None):
-    data = {'model': compiled['model'], 'prompt': compiled['prompt'], 'size': compiled.get('size', 'auto')}
+    data = {'model': compiled['model'], 'prompt': compiled['prompt'], 'size': compiled.get('size', 'auto'), 'n': '1'}
     if compiled.get('quality'):
         data['quality'] = compiled['quality']
     files = [('image[]', (f'image-{i+1}.png', (config.DATA / store.asset(aid)['path']).read_bytes(), 'image/png'))

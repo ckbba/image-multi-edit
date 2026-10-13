@@ -14,6 +14,15 @@ def load_env():
 
 
 load_env()
+
+
+def normalize_model_setting(model):
+    return {
+        'gpt-image-2.5-flare': 'gpt-image-2.5-flare-eco',
+        'gpt-image-2.5-sunburst': 'gpt-image-2.5-sunburst-eco',
+    }.get(model, model)
+
+
 DATA = Path(os.getenv('DATA_DIR', str(ROOT / 'data'))).resolve()
 PASSWORD = os.getenv('SITE_PASSWORD', '')
 MODEL_DIR = Path(os.getenv('SEGMENTATION_MODEL_DIR', str(ROOT / '.models/slimsam'))).resolve()
@@ -21,7 +30,7 @@ SEGMENTATION_DEVICE = os.getenv('SEGMENTATION_DEVICE', 'cpu').lower()
 MODE = os.getenv('GENERATION_MODE', 'simulation')
 BASE = os.getenv('IMAGE25_BASE_URL', 'https://task-api-1-cn.65535.space').rstrip('/')
 KEY = os.getenv('IMAGE25_API_KEY', '')
-MODEL = os.getenv('IMAGE25_MODEL', '')
+MODEL = normalize_model_setting(os.getenv('IMAGE25_MODEL', ''))
 EXPERIMENTAL = os.getenv('IMAGE25_EXPERIMENTAL', 'false').lower() == 'true'
 SOURCE_STRATEGY = os.getenv('SOURCE_STRATEGY', 'full')
 GEMINI_BASE = os.getenv('GEMINI_BASE_URL', 'https://cccodex.cn/v1/chat/completions')

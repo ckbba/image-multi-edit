@@ -198,7 +198,7 @@ def create_draft():
 def latest_draft():
     with store.db() as con:
         row = con.execute('SELECT state FROM drafts ORDER BY updated DESC LIMIT 1').fetchone()
-    return json.loads(row['state']) if row else store.new_draft()
+    return store.normalize_draft_state(json.loads(row['state'])) if row else store.new_draft()
 
 
 @app.get('/api/drafts/{did}')
@@ -207,7 +207,7 @@ def get_draft(did: str):
         row = con.execute('SELECT state FROM drafts WHERE id=?', (did,)).fetchone()
     if not row:
         raise HTTPException(404, '草稿不存在')
-    return json.loads(row['state'])
+    return store.normalize_draft_state(json.loads(row['state']))
 
 
 @app.put('/api/drafts/{did}')
@@ -247,7 +247,8 @@ async def submit(request: Request):
     if legacy:
         old = json.loads(legacy['snapshot'])
         old_compiler = old.get('compiled', {}).get('compiler_version')
-        if old.get('mode') == config.MODE and old.get('model', store.DEFAULT_GENERATION_MODEL) == selected_model and old_compiler == provider.COMPILER_VERSION:
+        old_model = store.normalize_generation_model(old.get('model'))
+        if old.get('mode') == config.MODE and old_model == selected_model and old_compiler == provider.COMPILER_VERSION:
             previous = legacy
     if previous:
         return public_job(store.job(previous['id'], True))
@@ -318,7 +319,7 @@ async def restore(jid: str, request: Request):
     body = await request.json()
     state = json.loads(json.dumps(job['snapshot']['state']))
     state['origin_history_id'] = jid
-    restored_model = job['snapshot'].get('model')
+    restored_model = store.normalize_generation_model(job['snapshot'].get('model'))
     state['generation_model'] = restored_model if restored_model in store.GENERATION_MODELS else store.DEFAULT_GENERATION_MODEL
     state['source_strategy'] = job['snapshot'].get('compiled', {}).get('strategy', 'full')
     state['name'] += ' · 恢复'

@@ -140,7 +140,15 @@ COLORS = ['#8b5cf6', '#3b82f6', '#f59e0b', '#10b981', '#ec4899']
 REFERENCE_UPLOAD_LIMIT = 12
 MAPPING_DRAFT_LIMIT = 20
 MODEL_REFERENCE_LIMIT = 12
-GENERATION_MODELS = ('gpt-image-2.5-flare', 'gpt-image-2.5-sunburst')
+GENERATION_MODELS = ('gpt-image-2.5-flare-eco', 'gpt-image-2.5-sunburst-eco')
+LEGACY_GENERATION_MODELS = {
+    'gpt-image-2.5-flare': GENERATION_MODELS[0],
+    'gpt-image-2.5-sunburst': GENERATION_MODELS[1],
+}
+
+
+def normalize_generation_model(model):
+    return LEGACY_GENERATION_MODELS.get(model, model or DEFAULT_GENERATION_MODEL)
 
 
 def effective_text_edits(state):
@@ -247,8 +255,13 @@ def validate(state, for_submit=False, allow_overlap=False):
     return conflicts
 
 
+def normalize_draft_state(state):
+    state['generation_model'] = normalize_generation_model(state.get('generation_model'))
+    return state
+
+
 def new_draft(state=None):
-    state = json.loads(json.dumps(state)) if state else dict(schema_version=3, name='未命名编辑', main_image=None,
+    state = normalize_draft_state(json.loads(json.dumps(state))) if state else dict(schema_version=3, name='未命名编辑', main_image=None,
         references=[], mappings=[], text_edits=[], full_image_refs=[], next_display_index=1, instructions='', source_strategy='context-crop')
     state['id'] = uid()
     state['project_id'] = state.get('project_id', uid())
