@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {imageRect,referenceImageRect,detectedSelectionStatus,toImage,createMapping,createMainEditMapping,createMainEditTransient,commitMainEditTransient,addMapping,removeEmptyDraftMapping,consumePreviewSuppression,SerialActionQueue,UndoStack,LatestRequest,COLORS,normalizeEditorState,applyRecognizedLabel,composerMappingToken,mappingPreviewAssets,mappingPreviewKey,updateMappingLabel,composerEntries,confirmRequirement,cancelRequirementDraft,composerFragmentText,applyComposerFragment,retryTransient,REFERENCE_UPLOAD_LIMIT,MAPPING_DRAFT_LIMIT,MODEL_REFERENCE_LIMIT,generationReferenceCount,assertGenerationReferenceLimit,candidateSide,isEditableTarget,imageFilesFromTransfer,dragPreviewSize,createTextEdit,upsertTextEdit,modifiedTextEdits,replaceMainImage,findTextRegion,mergeTypedCandidates,nextTypedCandidate,isEffectiveTextEdit} from '../前端代码/core.js';
+import {imageRect,referenceImageRect,detectedSelectionStatus,toImage,createMapping,createMainEditMapping,createMainEditTransient,commitMainEditTransient,addMapping,removeEmptyDraftMapping,consumePreviewSuppression,SerialActionQueue,UndoStack,LatestRequest,COLORS,normalizeEditorState,applyRecognizedLabel,composerMappingToken,mappingPreviewAssets,mappingPreviewKey,historyFrozenMappingInput,historySelectedPreviewAssets,updateMappingLabel,composerEntries,confirmRequirement,cancelRequirementDraft,composerFragmentText,applyComposerFragment,retryTransient,REFERENCE_UPLOAD_LIMIT,MAPPING_DRAFT_LIMIT,MODEL_REFERENCE_LIMIT,generationReferenceCount,assertGenerationReferenceLimit,candidateSide,isEditableTarget,imageFilesFromTransfer,dragPreviewSize,createTextEdit,upsertTextEdit,modifiedTextEdits,replaceMainImage,findTextRegion,mergeTypedCandidates,nextTypedCandidate,isEffectiveTextEdit} from '../前端代码/core.js';
 
 test('letterbox coordinates remain stable across viewport sizes; margins reject points',()=>{
  for(const [w,h] of [[500,400],[200,700],[1200,500]]){const r=imageRect(w,h,1200,800);const p=toImage(r.x+r.width*.25,r.y+r.height*.75,r);assert.ok(Math.abs(p.x-.25)<1e-10);assert.ok(Math.abs(p.y-.75)<1e-10);assert.equal(toImage(r.x-1,r.y,r),null);}
@@ -29,6 +29,21 @@ test('actual model preview key refreshes for focus, label and source selection c
  assert.notEqual(mappingPreviewKey({...mapping,source:{...mapping.source,label:'海报'}}),original);
  assert.notEqual(mappingPreviewKey({...mapping,source:{...mapping.source,mask_id:'mask-2'}}),original);
 });
+test('history preview separates frozen model input from selected-region UI preview',()=>{
+ const state={main_image:'main',mappings:[
+  {id:'source-map',kind:'reference-edit',source:{image_id:'source-full',mask_id:'source-mask'},target:{image_id:'main',mask_id:'target-a'}},
+  {id:'local-map',kind:'main-edit',source:null,target:{image_id:'main',mask_id:'target-local'}}]};
+ const compiled={inputs:['main','saved-source-crop','source-full'],bindings:[
+  {kind:'element',mapping_id:'source-map',input_index:2,input_asset_id:'saved-source-crop'},
+  {kind:'main-edit',mapping_id:'local-map',mask_id:'target-local'},
+  {kind:'full-image',reference_id:'whole',input_index:3,original_id:'source-full'}]};
+ assert.deepEqual(historyFrozenMappingInput(state,compiled,'source-map'),{kind:'reference-input',assetId:'saved-source-crop',inputIndex:2});
+ assert.deepEqual(historyFrozenMappingInput(state,compiled,'local-map'),{kind:'main-image-no-separate-reference',assetId:'main',inputIndex:1});
+ assert.deepEqual(historyFrozenMappingInput(state,{inputs:['main'],bindings:[]},'source-map'),{kind:'unavailable',assetId:null,inputIndex:null});
+ assert.deepEqual(historySelectedPreviewAssets(state,'source-map'),{mappingId:'source-map',imageId:'source-full',maskId:'source-mask',role:'source'});
+ assert.deepEqual(historySelectedPreviewAssets(state,'local-map'),{mappingId:'local-map',imageId:'main',maskId:'target-local',role:'target'});
+});
+
 test('manual name remains text guidance and reports that selected region was not relocated',()=>{
  const state=normalizeEditorState({mappings:[{id:'m',source:{image_id:'ref',mask_id:'mask',label:'女人',label_source:'ai'},target:{}}]});
  const result=updateMappingLabel(state,'m','奖杯');
