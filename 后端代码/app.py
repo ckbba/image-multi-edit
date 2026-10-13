@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request, UploadFile, File, HTTPException
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
@@ -182,6 +182,29 @@ async def recognize_text(aid: str):
 async def mask(request: Request):
     data = await request.json()
     return await run_in_threadpool(store.manual_mask, data['image_id'], data['points'])
+
+
+@app.post('/api/reference-preview')
+async def reference_preview(request: Request):
+    data = await request.json()
+    mapping = data.get('mapping')
+    if not isinstance(mapping, dict):
+        raise HTTPException(400, '缺少操作快照')
+    # Validate asset provenance without saving a draft, creating an asset, running
+    # recognition/segmentation, or creating a generation job.
+    source = mapping.get('source')
+    target = mapping.get('target') or {}
+    if source:
+        image_meta = store.asset(source.get('image_id'))
+        mask_meta = store.asset(source.get('mask_id'))
+        if image_meta['kind'] not in ('image', 'output') or mask_meta['kind'] != 'mask' or mask_meta['origin']['image_id'] != source['image_id']:
+            raise HTTPException(400, '源选区与素材不匹配')
+    else:
+        store.asset(target.get('image_id'))
+    content, _, kind, focus = await run_in_threadpool(provider.reference_input_bytes, mapping)
+    return Response(content, media_type='image/png', headers={
+        'X-Reference-Preview-Kind': kind, 'X-Subject-Focus': focus,
+        'Cache-Control': 'private, max-age=60'})
 
 
 @app.post('/api/validate')

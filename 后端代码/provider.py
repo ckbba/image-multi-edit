@@ -15,7 +15,7 @@ from fastapi import HTTPException
 import config
 import store
 
-COMPILER_VERSION = 'mixed-input-v5-text-edits'
+COMPILER_VERSION = 'mixed-input-v6-subject-focus'
 
 
 def preflight(model=None):
@@ -39,7 +39,42 @@ def preflight(model=None):
 
 
 def png(im):
-    f = io.BytesIO(); im.save(f, format='PNG'); return f.getvalue()
+    f = io.BytesIO(); im.save(f, format='PNG', compress_level=6); return f.getvalue()
+
+
+def reference_input_image(mapping, strategy='context-crop'):
+    """Pure derivation shared by compiler and zero-write hover preview."""
+    source = mapping.get('source')
+    if not source:
+        return store.image(mapping['target']['image_id']).copy(), None, 'main-image-no-separate-reference', 'off'
+    if strategy not in ('full', 'context-crop', 'transparent'):
+        raise ValueError('Unknown source strategy')
+    image = store.image(source['image_id']).convert('RGBA')
+    mask = store.image(source['mask_id']).getchannel('A').resize(image.size, Image.Resampling.NEAREST)
+    bbox = store.asset(source['mask_id'])['bbox']
+    if strategy == 'full':
+        box = (0, 0, image.width, image.height)
+    else:
+        dx, dy = (bbox[2] - bbox[0]) * .08, (bbox[3] - bbox[1]) * .08
+        box = (max(0, int((bbox[0] - dx) * image.width)), max(0, int((bbox[1] - dy) * image.height)),
+               min(image.width, int((bbox[2] + dx) * image.width + 1)), min(image.height, int((bbox[3] + dy) * image.height + 1)))
+    focus = 'selected-mask' if mapping.get('subject_focus') is True else 'off'
+    if strategy == 'transparent':
+        image.putalpha(mask)
+    elif focus == 'selected-mask':
+        # Keep dimensions/context stable, but visibly de-emphasize pixels outside the
+        # already confirmed mask. A typed name never fabricates or relocates a mask.
+        neutral = Image.new('RGBA', image.size, (238, 238, 242, 255))
+        softened = Image.blend(image, neutral, .72)
+        image = Image.composite(image, softened, mask)
+    origin = {'image_id': source['image_id'], 'box_pixels': box, 'margin_fraction': .08,
+              'strategy': strategy, 'strategy_version': 2, 'subject_focus': focus}
+    return image.crop(box), origin, 'model-reference-input', focus
+
+
+def reference_input_bytes(mapping, strategy='context-crop'):
+    image, origin, kind, focus = reference_input_image(mapping, strategy)
+    return png(image), origin, kind, focus
 
 
 def native_edit_mask(mask_ids, main_image_id):
@@ -89,15 +124,10 @@ def compile_request(state, strategy=None):
         source_mask = store.asset(src['mask_id'])
         bbox = source_mask['bbox']
         derived = None
+        focus = 'selected-mask' if m.get('subject_focus') is True else 'off'
         if strategy != 'full':
-            im = store.image(source_id).convert('RGBA')
-            if strategy == 'transparent':
-                im.putalpha(store.image(src['mask_id']).getchannel('A'))
-            dx, dy = (bbox[2] - bbox[0]) * .08, (bbox[3] - bbox[1]) * .08
-            box = (max(0, int((bbox[0] - dx) * im.width)), max(0, int((bbox[1] - dy) * im.height)),
-                   min(im.width, int((bbox[2] + dx) * im.width + 1)), min(im.height, int((bbox[3] + dy) * im.height + 1)))
-            derived = store.persist_image(im.crop(box), f'source-{m["display_index"]}.png', 'crop',
-                {'image_id': source_id, 'box_pixels': box, 'margin_fraction': .08, 'strategy': strategy, 'strategy_version': 1})
+            derived_image, origin, _, focus = reference_input_image(m, strategy)
+            derived = store.persist_image(derived_image, f'source-{m["display_index"]}.png', 'crop', origin)
             source_id = derived['id']
         inputs.append(source_id)
         index = len(inputs)
@@ -107,9 +137,10 @@ def compile_request(state, strategy=None):
                      f'for the edit around IMAGE 1 target region {target_bbox}, '
                      f'with intended location near normalized point ({tgt["anchor"]["x"]}, {tgt["anchor"]["y"]}). '
                      + (f'User requirement: {action}. ' if action else 'Default intent: replace the selected target object with the source object. ')
+                     + ('The model reference input visually emphasizes the existing selected source mask; treat the subject name as text guidance only. ' if focus == 'selected-mask' else '')
                      + 'Do not copy the source background unless explicitly requested.')
         bindings.append({'kind':'element','mapping_id': m['id'], 'display_index': m['display_index'], 'input_index': index,
-                         'original_id': src['image_id'], 'input_asset_id': source_id, 'crop': derived, 'target_bbox': target_bbox,
+                         'original_id': src['image_id'], 'input_asset_id': source_id, 'crop': derived, 'subject_focus': focus, 'target_bbox': target_bbox,
                          'target_anchor': dict(tgt['anchor'])})
     for edit in store.effective_text_edits(state):
         original, replacement, bbox = edit['original_text'].strip(), edit['replacement'].strip(), edit['bbox']

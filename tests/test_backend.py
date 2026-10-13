@@ -303,6 +303,53 @@ def test_default_compile_uses_element_context_crop_even_for_legacy_full_state(cl
     assert compiled['bindings'][0]['crop'] is not None
 
 
+def test_reference_preview_bytes_equal_compiled_input_without_creating_job(client):
+    state=ready(client)
+    mapping=state['mappings'][0]
+    before_jobs=client.get('/api/jobs').json()['items']
+    with store.db() as con:
+        before_assets={row['id'] for row in con.execute('SELECT id FROM assets')}
+    preview=client.post('/api/reference-preview',json={'mapping':mapping})
+    assert preview.status_code==200,preview.text
+    assert preview.headers['x-reference-preview-kind']=='model-reference-input'
+    assert preview.headers['x-subject-focus']=='off'
+    assert client.get('/api/jobs').json()['items']==before_jobs
+    with store.db() as con:
+        after_assets={row['id'] for row in con.execute('SELECT id FROM assets')}
+    assert after_assets==before_assets
+    compiled=provider.compile_request(state)
+    sent=client.get('/api/assets/'+compiled['bindings'][0]['input_asset_id'])
+    assert preview.content==sent.content
+
+
+def test_subject_focus_is_explicit_mask_processing_and_preview_is_fresh(client):
+    state=ready(client)
+    mapping=state['mappings'][0]
+    raw=client.post('/api/reference-preview',json={'mapping':mapping})
+    mapping['subject_focus']=True
+    focused=client.post('/api/reference-preview',json={'mapping':mapping})
+    assert focused.status_code==200,focused.text
+    assert focused.headers['x-subject-focus']=='selected-mask'
+    assert focused.content!=raw.content
+    state['mappings'][0]=mapping
+    compiled=provider.compile_request(state)
+    binding=compiled['bindings'][0]
+    assert binding['subject_focus']=='selected-mask'
+    assert focused.content==client.get('/api/assets/'+binding['input_asset_id']).content
+    assert 'existing selected source mask' in compiled['prompt']
+
+
+def test_main_edit_preview_is_truthful_main_input_and_never_a_reference_crop(client):
+    state=ready(client);state['mappings']=[];state['references']=[]
+    selected=mask(client,state['main_image'],.2,.2)
+    mapping={'id':'main-local','kind':'main-edit','display_index':1,'color':store.COLORS[0],'mode':'replace','requirement':'提亮主体','source':None,
+        'target':{'image_id':state['main_image'],'image_version':1,'mask_id':selected['id'],'edit_region_id':selected['id'],'anchor':{'x':.3,'y':.3}}}
+    response=client.post('/api/reference-preview',json={'mapping':mapping})
+    assert response.status_code==200
+    assert response.headers['x-reference-preview-kind']=='main-image-no-separate-reference'
+    assert response.content==client.get('/api/assets/'+state['main_image']).content
+
+
 def test_overlapping_targets_keep_distinct_anchor_intent(client):
     state=ready(client)
     second=copy.deepcopy(state['mappings'][0]);second.update(id='other-point',display_index=2,color=store.COLORS[1])

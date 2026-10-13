@@ -214,6 +214,10 @@ def validate(state, for_submit=False, allow_overlap=False):
             raise HTTPException(400, '编辑类型与来源不匹配')
         if source and len(source.get('label', '')) > 10:
             raise HTTPException(400, '物品名称最多 10 字')
+        if mapping.get('subject_focus') not in (None, False, True):
+            raise HTTPException(400, '主体突出设置无效')
+        if mapping.get('subject_focus') is True and not source:
+            raise HTTPException(400, '主图局部编辑没有单独模型参考输入，不能启用主体突出')
         if len(mapping.get('requirement', '')) > 1000:
             raise HTTPException(400, '单条操作要求最多 1000 字')
         for side in (('target',) if kind == 'main-edit' else ('source', 'target')):

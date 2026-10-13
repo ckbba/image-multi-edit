@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {imageRect,referenceImageRect,detectedSelectionStatus,toImage,createMapping,createMainEditMapping,createMainEditTransient,commitMainEditTransient,addMapping,removeEmptyDraftMapping,consumePreviewSuppression,SerialActionQueue,UndoStack,LatestRequest,COLORS,normalizeEditorState,applyRecognizedLabel,composerMappingToken,mappingPreviewAssets,composerEntries,confirmRequirement,cancelRequirementDraft,composerFragmentText,applyComposerFragment,retryTransient,REFERENCE_UPLOAD_LIMIT,MAPPING_DRAFT_LIMIT,MODEL_REFERENCE_LIMIT,generationReferenceCount,assertGenerationReferenceLimit,candidateSide,isEditableTarget,imageFilesFromTransfer,dragPreviewSize,createTextEdit,upsertTextEdit,modifiedTextEdits,replaceMainImage,findTextRegion,mergeTypedCandidates,nextTypedCandidate,isEffectiveTextEdit} from '../前端代码/core.js';
+import {imageRect,referenceImageRect,detectedSelectionStatus,toImage,createMapping,createMainEditMapping,createMainEditTransient,commitMainEditTransient,addMapping,removeEmptyDraftMapping,consumePreviewSuppression,SerialActionQueue,UndoStack,LatestRequest,COLORS,normalizeEditorState,applyRecognizedLabel,composerMappingToken,mappingPreviewAssets,mappingPreviewKey,updateMappingLabel,composerEntries,confirmRequirement,cancelRequirementDraft,composerFragmentText,applyComposerFragment,retryTransient,REFERENCE_UPLOAD_LIMIT,MAPPING_DRAFT_LIMIT,MODEL_REFERENCE_LIMIT,generationReferenceCount,assertGenerationReferenceLimit,candidateSide,isEditableTarget,imageFilesFromTransfer,dragPreviewSize,createTextEdit,upsertTextEdit,modifiedTextEdits,replaceMainImage,findTextRegion,mergeTypedCandidates,nextTypedCandidate,isEffectiveTextEdit} from '../前端代码/core.js';
 
 test('letterbox coordinates remain stable across viewport sizes; margins reject points',()=>{
  for(const [w,h] of [[500,400],[200,700],[1200,500]]){const r=imageRect(w,h,1200,800);const p=toImage(r.x+r.width*.25,r.y+r.height*.75,r);assert.ok(Math.abs(p.x-.25)<1e-10);assert.ok(Math.abs(p.y-.75)<1e-10);assert.equal(toImage(r.x-1,r.y,r),null);}
@@ -21,6 +21,20 @@ test('composer mapping token uses stable display index and color, with no blank-
 test('mapping hover preview binds the stable mapping to its selected source or main-local mask',()=>{
  assert.deepEqual(mappingPreviewAssets({id:'source-map',source:{image_id:'ref',mask_id:'source-mask'},target:{image_id:'main',mask_id:'target-mask'}}),{mappingId:'source-map',imageId:'ref',maskId:'source-mask'});
  assert.deepEqual(mappingPreviewAssets({id:'local-map',source:null,target:{image_id:'main',mask_id:'local-mask'}}),{mappingId:'local-map',imageId:'main',maskId:'local-mask'});
+});
+test('actual model preview key refreshes for focus, label and source selection changes',()=>{
+ const mapping={id:'m',source:{image_id:'ref',image_version:1,mask_id:'mask',label:'奖杯'},subject_focus:false};
+ const original=mappingPreviewKey(mapping);
+ assert.notEqual(mappingPreviewKey({...mapping,subject_focus:true}),original);
+ assert.notEqual(mappingPreviewKey({...mapping,source:{...mapping.source,label:'海报'}}),original);
+ assert.notEqual(mappingPreviewKey({...mapping,source:{...mapping.source,mask_id:'mask-2'}}),original);
+});
+test('manual name remains text guidance and reports that selected region was not relocated',()=>{
+ const state=normalizeEditorState({mappings:[{id:'m',source:{image_id:'ref',mask_id:'mask',label:'女人',label_source:'ai'},target:{}}]});
+ const result=updateMappingLabel(state,'m','奖杯');
+ assert.equal(result.state.mappings[0].source.label,'奖杯');
+ assert.equal(result.state.mappings[0].source.mask_id,'mask');
+ assert.equal(result.feedback,'主体名称仅作文字提示，未定位到新区域；如选区不符请纠正源选区');
 });
 test('deletion, undo and redo preserve IDs, colors and monotonic display number',()=>{
  let s={mappings:[],next_display_index:1};const u=new UndoStack();for(let i=0;i<3;i++)s=addMapping(s,createMapping(s,{image_id:'ref'},{image_id:'main'}));const old=structuredClone(s);u.push(s);s.mappings.splice(1,1);const newMapping=createMapping(s,{},{});assert.equal(newMapping.display_index,4);s=addMapping(s,newMapping);assert.deepEqual(s.mappings.map(m=>m.display_index),[1,3,4]);s=u.undo(s);assert.deepEqual(s,old);s=u.redo(s);assert.equal(s.mappings[1].id,old.mappings[2].id);assert.equal(s.mappings[1].color,COLORS[2]);
