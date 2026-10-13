@@ -39,8 +39,9 @@ def _recognize_uncached(aid):
     if not python.is_file():
         raise HTTPException(503, '本机真实文字识别环境未安装；未使用假识别结果')
     try:
+        worker_env = {**os.environ, 'PYTHONIOENCODING': 'utf-8', 'PYTHONUTF8': '1'}
         process = subprocess.run([str(python), str(WORKER), str(image)], capture_output=True,
-                                 timeout=90, check=False)
+                                 timeout=90, check=False, env=worker_env)
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise HTTPException(503, '本机文字识别进程不可用，请稍后重试') from exc
     if process.returncode:
