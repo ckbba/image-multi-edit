@@ -12,13 +12,28 @@ import store
 
 DEFAULT_PYTHON = Path('D:/image-editor-development/text-ocr-env/Scripts/python.exe')
 WORKER = Path(__file__).with_name('text_ocr_worker.py')
+_cache = {}
 
 
 def available():
     return Path(os.getenv('TEXT_OCR_PYTHON', str(DEFAULT_PYTHON))).is_file()
 
 
+def clear_cache():
+    _cache.clear()
+
+
 def recognize(aid):
+    asset = store.asset(aid)
+    key = (aid, asset.get('version', 1))
+    if key in _cache:
+        return {**json.loads(json.dumps(_cache[key])), 'cached': True}
+    result = _recognize_uncached(aid)
+    _cache[key] = json.loads(json.dumps(result))
+    return {**result, 'cached': False}
+
+
+def _recognize_uncached(aid):
     image = config.DATA / store.asset(aid)['path']
     python = Path(os.getenv('TEXT_OCR_PYTHON', str(DEFAULT_PYTHON)))
     if not python.is_file():

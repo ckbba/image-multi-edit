@@ -442,6 +442,18 @@ def test_text_only_edit_validates_compiles_and_restores_without_reference_input(
     assert restored['text_edits'] == state['text_edits']
 
 
+def test_compile_filters_noop_text_edits_and_never_leaks_unmodified_ocr_text(client):
+    state = ready(client); state['mappings'] = []; state['references'] = []; state['full_image_refs'] = []
+    effective = {'id':'changed','image_id':state['main_image'],'image_version':1,'source':'ocr','original_text':'旧字','replacement':'新字','bbox':[.1,.1,.3,.2]}
+    sentinel = {'id':'sentinel','image_id':state['main_image'],'image_version':1,'source':'ocr','original_text':'NEVER_SEND_THIS_OCR_TEXT','replacement':' NEVER_SEND_THIS_OCR_TEXT ','bbox':[.4,.4,.6,.5]}
+    state['text_edits'] = [effective, sentinel]
+    compiled = provider.compile_request(state)
+    assert [b['text_edit_id'] for b in compiled['bindings']] == ['changed']
+    assert 'NEVER_SEND_THIS_OCR_TEXT' not in compiled['prompt']
+    with pytest.raises(Exception):
+        store.validate({**state, 'text_edits':[sentinel]}, True, True)
+
+
 def test_text_edit_validation_rejects_wrong_image_empty_or_invalid_bbox(client):
     state = ready(client); state['mappings'] = []
     base = {'id':'t1','image_id':'wrong','image_version':1,'source':'ocr','original_text':'旧字','replacement':'新字','bbox':[.1,.2,.3,.4]}
@@ -459,6 +471,20 @@ def test_ocr_endpoint_returns_real_adapter_output_without_creating_job(client, m
     response = client.post('/api/text-recognition/' + asset['id'])
     assert response.status_code == 200 and response.json() == expected
     assert client.get('/api/jobs').json()['items'] == before
+
+
+def test_ocr_endpoint_reuses_image_version_cache(client, monkeypatch):
+    import text_recognition
+    asset = upload(client)
+    calls = []
+    monkeypatch.setattr(text_recognition, '_recognize_uncached', lambda aid: calls.append(aid) or {'engine':'rapidocr','items':[]})
+    text_recognition.clear_cache()
+    first = client.post('/api/text-recognition/' + asset['id'])
+    second = client.post('/api/text-recognition/' + asset['id'])
+    assert first.status_code == second.status_code == 200
+    assert calls == [asset['id']]
+    assert first.json()['cached'] is False
+    assert second.json()['cached'] is True
 
 
 def test_generation_model_allowlist_default_snapshot_restore_and_adapter(client, monkeypatch):

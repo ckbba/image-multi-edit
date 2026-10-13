@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {imageRect,referenceImageRect,detectedSelectionStatus,toImage,createMapping,createMainEditMapping,createMainEditTransient,commitMainEditTransient,addMapping,removeEmptyDraftMapping,consumePreviewSuppression,SerialActionQueue,UndoStack,LatestRequest,COLORS,normalizeEditorState,composerEntries,confirmRequirement,cancelRequirementDraft,composerFragmentText,applyComposerFragment,retryTransient,REFERENCE_UPLOAD_LIMIT,MAPPING_DRAFT_LIMIT,MODEL_REFERENCE_LIMIT,generationReferenceCount,assertGenerationReferenceLimit,candidateSide,isEditableTarget,imageFilesFromTransfer,dragPreviewSize,createTextEdit,upsertTextEdit,modifiedTextEdits,replaceMainImage} from '../前端代码/core.js';
+import {imageRect,referenceImageRect,detectedSelectionStatus,toImage,createMapping,createMainEditMapping,createMainEditTransient,commitMainEditTransient,addMapping,removeEmptyDraftMapping,consumePreviewSuppression,SerialActionQueue,UndoStack,LatestRequest,COLORS,normalizeEditorState,composerEntries,confirmRequirement,cancelRequirementDraft,composerFragmentText,applyComposerFragment,retryTransient,REFERENCE_UPLOAD_LIMIT,MAPPING_DRAFT_LIMIT,MODEL_REFERENCE_LIMIT,generationReferenceCount,assertGenerationReferenceLimit,candidateSide,isEditableTarget,imageFilesFromTransfer,dragPreviewSize,createTextEdit,upsertTextEdit,modifiedTextEdits,replaceMainImage,findTextRegion,mergeTypedCandidates,nextTypedCandidate,isEffectiveTextEdit} from '../前端代码/core.js';
 
 test('letterbox coordinates remain stable across viewport sizes; margins reject points',()=>{
  for(const [w,h] of [[500,400],[200,700],[1200,500]]){const r=imageRect(w,h,1200,800);const p=toImage(r.x+r.width*.25,r.y+r.height*.75,r);assert.ok(Math.abs(p.x-.25)<1e-10);assert.ok(Math.abs(p.y-.75)<1e-10);assert.equal(toImage(r.x-1,r.y,r),null);}
@@ -163,4 +163,35 @@ test('changing the main image clears text edits while unrelated reset paths can 
  assert.equal(next.main_image,'new');
  assert.deepEqual(next.mappings,[]);
  assert.deepEqual(next.text_edits,[]);
+});
+
+test('OCR hit testing uses the text polygon and prefers the smallest overlapping line',()=>{
+ const broad={id:'broad',bbox:[.1,.1,.8,.4],polygon:[[.1,.1],[.8,.1],[.8,.4],[.1,.4]]};
+ const line={id:'line',bbox:[.2,.2,.6,.3],polygon:[[.2,.2],[.6,.2],[.55,.3],[.2,.3]]};
+ assert.equal(findTextRegion([broad,line],{x:.3,y:.25}).id,'line');
+ assert.equal(findTextRegion([line],{x:.59,y:.29}),null);
+ assert.equal(findTextRegion([line],{x:.3,y:.8}),null);
+});
+
+test('overlapping main candidates cycle text to every SAM mask and back without async result stealing text',()=>{
+ const text={id:'line',text:'误识原文',bbox:[.2,.2,.6,.3]};
+ let merged=mergeTypedCandidates(text,[],null);
+ assert.deepEqual(merged.map(x=>x.kind),['text']);
+ const selected=merged[0].key;
+ merged=mergeTypedCandidates(text,[{id:'m1'},{id:'m2'},{id:'m3'}],selected);
+ assert.equal(merged.find(x=>x.selected).kind,'text');
+ let index=0;const kinds=[];
+ for(let i=0;i<4;i++){index=nextTypedCandidate(merged,index);kinds.push(merged[index].kind);}
+ assert.deepEqual(kinds,['segment','segment','segment','text']);
+ assert.equal(mergeTypedCandidates(null,[{id:'m1'}],null).some(x=>x.kind==='text'),false);
+});
+
+test('effective text edit requires non-empty replacement different from confirmed original',()=>{
+ assert.equal(isEffectiveTextEdit({original_text:' Café! ',replacement:'Café!'}),false);
+ assert.equal(isEffectiveTextEdit({original_text:'Café!',replacement:'Cafe!'}),true);
+ assert.equal(isEffectiveTextEdit({original_text:'Café!',replacement:'   '}),false);
+ let state=normalizeEditorState({text_edits:[{id:'t',original_text:'旧字',replacement:'新字'}]});
+ assert.equal(modifiedTextEdits(state).length,1);
+ state=upsertTextEdit(state,{id:'t',original_text:'旧字',replacement:'旧字'});
+ assert.equal(state.text_edits.length,0);
 });

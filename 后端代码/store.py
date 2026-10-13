@@ -141,6 +141,12 @@ REFERENCE_UPLOAD_LIMIT = 12
 MAPPING_DRAFT_LIMIT = 20
 MODEL_REFERENCE_LIMIT = 12
 GENERATION_MODELS = ('gpt-image-2.5-flare', 'gpt-image-2.5-sunburst')
+
+
+def effective_text_edits(state):
+    return [edit for edit in state.get('text_edits', [])
+            if str(edit.get('replacement', '')).strip()
+            and str(edit.get('replacement', '')).strip() != str(edit.get('original_text', '')).strip()]
 DEFAULT_GENERATION_MODEL = GENERATION_MODELS[0]
 
 
@@ -149,6 +155,7 @@ def validate(state, for_submit=False, allow_overlap=False):
     refs = state.get('references', [])
     whole_refs = state.get('full_image_refs', [])
     text_edits = state.get('text_edits', [])
+    effective_edits = effective_text_edits(state)
     if len(refs) > REFERENCE_UPLOAD_LIMIT or len(set(refs)) != len(refs):
         raise HTTPException(400, '最多 12 张参考图，且不能重复添加同一素材')
     if len(mappings) > MAPPING_DRAFT_LIMIT:
@@ -227,7 +234,7 @@ def validate(state, for_submit=False, allow_overlap=False):
                 conflicts.append({'a': a, 'b': b, 'overlap': round(ratio, 4), 'duplicate': ratio > 0.85})
     if state.get('next_display_index', 1) <= max(numbers, default=0):
         raise HTTPException(400, '下个编号必须大于已分配编号')
-    if for_submit and (not main or (not mappings and not whole_refs and not text_edits)):
+    if for_submit and (not main or (not mappings and not whole_refs and not effective_edits)):
         raise HTTPException(400, '请准备主图和至少一条有效编辑关系、改字或整图引用')
     actual_references = len(mappings) + len(whole_refs)
     if for_submit and actual_references > MODEL_REFERENCE_LIMIT:

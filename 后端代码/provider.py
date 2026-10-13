@@ -111,7 +111,7 @@ def compile_request(state, strategy=None):
         bindings.append({'kind':'element','mapping_id': m['id'], 'display_index': m['display_index'], 'input_index': index,
                          'original_id': src['image_id'], 'input_asset_id': source_id, 'crop': derived, 'target_bbox': target_bbox,
                          'target_anchor': dict(tgt['anchor'])})
-    for edit in state.get('text_edits', []):
+    for edit in store.effective_text_edits(state):
         original, replacement, bbox = edit['original_text'].strip(), edit['replacement'].strip(), edit['bbox']
         lines.append(f'Text edit in IMAGE 1 region {bbox}: replace the exact visible text "{original}" with "{replacement}". '
                      'Match the original typography, perspective, material, lighting and spacing; preserve all other text and pixels as closely as possible.')
