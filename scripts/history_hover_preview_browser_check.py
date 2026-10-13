@@ -6,7 +6,7 @@ from PIL import Image
 from playwright.sync_api import sync_playwright, expect
 
 ROOT=Path(__file__).resolve().parents[1]
-OUT=ROOT/'output'/'history-hover-preview'; DATA=OUT/'data'; BASE='http://127.0.0.1:8796'; PASSWORD='history-hover-isolated-password'
+OUT=ROOT/'output'/'history-hover-preview-final'; DATA=OUT/'data'; BASE='http://127.0.0.1:8796'; PASSWORD='history-hover-isolated-password'
 ENV={**os.environ,'DATA_DIR':str(DATA),'SITE_PASSWORD':PASSWORD,'PORT':'8796','GENERATION_MODE':'simulation'}
 OUT.mkdir(parents=True,exist_ok=True)
 log=(OUT/'server.log').open('w',encoding='utf-8')
@@ -32,17 +32,20 @@ try:
  wait_server()
  with httpx.Client(base_url=BASE,trust_env=False) as c:
   c.post('/api/login',json={'password':PASSWORD}).raise_for_status()
-  main=upload(c,'main.png','#4169a8');source=upload(c,'source.png','#c4475d');frozen=upload(c,'frozen-model-input.png','#29a36a')
+  main=upload(c,'main.png','#4169a8');source=upload(c,'source.png','#c4475d');unused=upload(c,'unused.png','#d1a62b');frozen=upload(c,'frozen-model-input.png','#29a36a');frozen2=upload(c,'frozen-model-input-2.png','#7446aa')
   source_mask=c.post('/api/masks',json={'image_id':source,'points':[[.2,.2],[.55,.2],[.55,.45],[.38,.45],[.38,.72],[.2,.72]]}).json()['id']
   source_target=c.post('/api/masks',json={'image_id':main,'points':[[.48,.18],[.8,.18],[.8,.7],[.48,.7]]}).json()['id']
   local_mask=c.post('/api/masks',json={'image_id':main,'points':[[.1,.5],[.34,.5],[.34,.88],[.1,.88]]}).json()['id']
-  state={'id':'history-fixture','revision':1,'name':'历史悬停零付费验收','main_image':main,'references':[source],'instructions':'保留构图','full_image_refs':[], 'text_edits':[], 'next_display_index':3,'generation_model':'gpt-image-2.5-flare-eco','source_strategy':'context-crop','mappings':[
+  state={'id':'history-fixture','revision':1,'name':'历史悬停零付费验收','main_image':main,'references':[source,unused],'instructions':'保留构图','full_image_refs':[], 'text_edits':[], 'next_display_index':4,'generation_model':'gpt-image-2.5-flare-eco','source_strategy':'context-crop','mappings':[
    {'id':'source-map','kind':'reference-edit','display_index':1,'color':'#8b5cf6','mode':'replace','requirement':'换成参考元素','source':{'image_id':source,'image_version':1,'mask_id':source_mask,'anchor':{'x':.3,'y':.3},'label':'元素'},'target':{'image_id':main,'image_version':1,'mask_id':source_target,'edit_region_id':source_target,'anchor':{'x':.62,'y':.35}}},
-   {'id':'local-map','kind':'main-edit','display_index':2,'color':'#3b82f6','mode':'replace','requirement':'改成金色','source':None,'target':{'image_id':main,'image_version':1,'mask_id':local_mask,'edit_region_id':local_mask,'anchor':{'x':.22,'y':.68}}}]}
-  compiled={'inputs':[main,frozen],'bindings':[{'kind':'element','mapping_id':'source-map','display_index':1,'input_index':2,'input_asset_id':frozen},{'kind':'main-edit','mapping_id':'local-map','display_index':2,'mask_id':local_mask}], 'strategy':'context-crop','compiler_version':'fixture'}
+   {'id':'source-map-2','kind':'reference-edit','display_index':2,'color':'#3b82f6','mode':'replace','requirement':'再放一份','source':{'image_id':source,'image_version':1,'mask_id':source_mask,'anchor':{'x':.3,'y':.3},'label':'元素'},'target':{'image_id':main,'image_version':1,'mask_id':local_mask,'edit_region_id':local_mask,'anchor':{'x':.22,'y':.68}}},
+   {'id':'local-map','kind':'main-edit','display_index':3,'color':'#f59e0b','mode':'replace','requirement':'改成金色','source':None,'target':{'image_id':main,'image_version':1,'mask_id':local_mask,'edit_region_id':local_mask,'anchor':{'x':.22,'y':.68}}}]}
+  compiled={'inputs':[main,frozen,frozen2],'bindings':[{'kind':'element','mapping_id':'source-map','original_id':source,'display_index':1,'input_index':2,'input_asset_id':frozen},{'mapping_id':'source-map-2','original_id':source,'display_index':2,'input_index':3,'input_asset_id':frozen2},{'kind':'main-edit','mapping_id':'local-map','display_index':3,'mask_id':local_mask}], 'strategy':'context-crop','compiler_version':'fixture'}
   jid='historyhoverfixture0000000000000000'
   with sqlite3.connect(DATA/'editor.sqlite') as db:
    db.execute('INSERT INTO jobs(id,idem,created,status,snapshot,result) VALUES(?,?,?,?,?,?)',(jid,jid,time.time(),'simulated',json.dumps({'state':state,'compiled':compiled,'mode':'simulation','model':state['generation_model']}),json.dumps({'calls':0,'cost_usd':0,'message':'fixture'})))
+  draft=c.post('/api/drafts').json(); state['id']=draft['id']; state['revision']=draft['revision'];
+  with sqlite3.connect(DATA/'editor.sqlite') as db: db.execute('UPDATE drafts SET revision=?,updated=?,state=? WHERE id=?',(state['revision'],time.time(),json.dumps(state),state['id']))
   before_jobs=c.get('/api/jobs').json()['items']; before_state=db_state()
  errors=[]; requests=[]
  with sync_playwright() as pw:
@@ -59,12 +62,23 @@ try:
   page.screenshot(path=str(OUT/'source-mask-token.png'),full_page=True)
   local_token=page.locator('[data-mapping-preview="local-map"]');page.mouse.move(1300,50);local_token.dispatch_event('focus');expect(page.locator('.history-selected-preview')).to_contain_text('主图目标蒙版元素 · 无单独参考图',timeout=10000)
   page.screenshot(path=str(OUT/'main-local-mask-token.png'),full_page=True)
+  source_asset=page.locator(f'[data-history-asset="{source}"]');source_asset.dispatch_event('mouseenter');expect(page.locator('.history-asset-gallery')).to_contain_text('IMAGE 2',timeout=10000);expect(page.locator('.history-asset-gallery')).to_contain_text('IMAGE 3');assert page.locator('.history-asset-gallery figure').count()==2
+  frozen_urls=page.locator('.history-asset-gallery img').evaluate_all("els=>els.map(e=>e.getAttribute('src'))");assert any(frozen in x for x in frozen_urls) and any(frozen2 in x for x in frozen_urls) and all(source not in x for x in frozen_urls)
+  page.screenshot(path=str(OUT/'history-source-multiple-frozen-inputs.png'),full_page=True)
+  unused_asset=page.locator(f'[data-history-asset="{unused}"]');unused_asset.dispatch_event('mouseenter');expect(page.locator('.history-asset-gallery')).to_contain_text('未发送模型',timeout=10000);assert unused in page.locator('.history-asset-gallery img').get_attribute('src')
+  main_asset=page.locator(f'[data-history-asset="{main}"]');main_asset.dispatch_event('mouseenter');expect(page.locator('.history-asset-gallery')).to_contain_text('主图 · IMAGE 1 · 实际模型输入',timeout=10000);assert main in page.locator('.history-asset-gallery img').get_attribute('src')
+  page.goto(BASE);expect(page.locator('#composer-assets')).to_be_visible(timeout=10000)
+  source_button=page.locator(f'[data-asset-menu="{source}"]');source_button.dispatch_event('mouseenter');expect(page.locator('.asset-preview-gallery')).to_contain_text('元素 1 · 选区预览（非实际模型输入）',timeout=10000);expect(page.locator('.asset-preview-gallery')).to_contain_text('元素 2 · 选区预览（非实际模型输入）');assert page.locator('.asset-preview-gallery canvas').count()==2
+  checker=page.locator('.asset-preview-gallery figure').first.evaluate("e=>getComputedStyle(e).backgroundImage");assert 'linear-gradient' in checker
+  canvas_alpha=page.locator('.asset-preview-gallery canvas').first.evaluate("c=>{const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let transparent=0;for(let i=3;i<d.length;i+=4)if(d[i]===0)transparent++;return transparent}");assert canvas_alpha>0
+  page.screenshot(path=str(OUT/'workspace-checker-element-gallery.png'),full_page=True)
+  unused_button=page.locator(f'[data-asset-menu="{unused}"]');unused_button.dispatch_event('mouseenter');expect(page.locator('.asset-preview-gallery')).to_contain_text('原素材 · 尚未选元素',timeout=10000);assert page.locator('.asset-preview-gallery canvas').count()==0
   page.keyboard.press('Escape');expect(page.locator('#asset-hover-preview')).to_be_hidden()
   browser.close()
  with httpx.Client(base_url=BASE,trust_env=False) as c:
   c.post('/api/login',json={'password':PASSWORD}).raise_for_status();after_jobs=c.get('/api/jobs').json()['items']
- result={'job_id':jid,'generation_calls':0,'paid_calls':0,'jobs_unchanged':before_jobs==after_jobs,'db_state_unchanged':before_state==db_state(),'non_get_requests_after_login':[r for r in requests if r['method']!='GET' and not r['url'].endswith('/api/login')],'frozen_input_url':frozen_src,'frozen_asset_id':frozen,'selected_canvas':size,'console_errors':errors,'screenshots':[str(OUT/p) for p in ['bubble-frozen-input.png','source-mask-token.png','main-local-mask-token.png']]}
- assert result['jobs_unchanged'] and result['db_state_unchanged'] and not result['non_get_requests_after_login'] and not errors,result
+ result={'job_id':jid,'generation_calls':0,'paid_calls':0,'jobs_unchanged':before_jobs==after_jobs,'db_state_unchanged':before_state==db_state(),'generation_requests':[r for r in requests if r['method']=='POST' and r['url'].rstrip('/').endswith('/api/jobs')],'non_generation_posts':[r for r in requests if r['method']=='POST' and not r['url'].rstrip('/').endswith('/api/jobs') and not r['url'].endswith('/api/login')],'frozen_input_url':frozen_src,'frozen_asset_id':frozen,'frozen_gallery_urls':frozen_urls,'selected_canvas':size,'workspace_canvas_transparent_pixels':canvas_alpha,'checker_background':checker,'console_errors':errors,'screenshots':[str(OUT/p) for p in ['bubble-frozen-input.png','source-mask-token.png','main-local-mask-token.png','history-source-multiple-frozen-inputs.png','workspace-checker-element-gallery.png']]}
+ assert result['jobs_unchanged'] and result['db_state_unchanged'] and not result['generation_requests'] and not errors,result
  (OUT/'check.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8');print(json.dumps(result,ensure_ascii=False))
 finally:
  proc.terminate()

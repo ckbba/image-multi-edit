@@ -51,3 +51,14 @@ def test_bubble_drag_only_starts_from_handle_not_form_fields():
     assert "closest('[data-text-bubble-drag]')" in viewer
     assert "setPointerCapture" in viewer
     assert "textEditBubblePosition" in viewer
+
+
+def test_saved_text_chip_opens_viewer_with_initial_bubble_and_region_focus():
+    app = (ROOT / "app.js").read_text(encoding="utf-8")
+    viewer = (ROOT / "viewer.js").read_text(encoding="utf-8")
+    assert "openTextEditor(state.text_edits.find" in app
+    assert "await openTextEditor(null,p.textHover)" in app
+    assert "textEditViewerTarget(saved,result.items||[])" in app
+    assert "options.textEdit?.initial&&!initialTextOpened" in viewer
+    assert "focusTextItem(options.textEdit.initial?.item||textHover)" in viewer
+    assert "data-text-bubble-close aria-label=\"关闭改字框\"" in app
