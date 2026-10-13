@@ -262,15 +262,28 @@ def test_save_retry_expired_url_and_continue(client,monkeypatch):
     assert client.get('/api/assets/'+aid).content==data.getvalue()
 
 
-def test_delete_keeps_shared_assets_and_restart_unknown(client):
-    state=ready(client);job=submit(client,state)
-    restored=client.post('/api/jobs/'+job['id']+'/restore',json={}).json()
-    assert client.delete('/api/jobs/'+job['id']).status_code==200
-    assert client.get('/api/jobs/'+job['id']).status_code==404
-    assert client.get('/api/assets/'+restored['main_image']).status_code==200
+def test_delete_keeps_shared_assets_other_history_and_refuses_active_jobs(client):
+    state=ready(client);deleted=submit(client,state,'delete-one')
+    restored=client.post('/api/jobs/'+deleted['id']+'/restore',json={}).json()
+    other=submit(client,restored,'keep-other')
+    shared_assets={state['main_image'],state['references'][0],state['mappings'][0]['source']['mask_id'],state['mappings'][0]['target']['mask_id']}
+
+    assert client.delete('/api/jobs/'+deleted['id']).json()=={'ok':True}
+    listed={item['id'] for item in client.get('/api/jobs').json()['items']}
+    assert deleted['id'] not in listed and other['id'] in listed
+    assert client.get('/api/jobs/'+deleted['id']).status_code==404
+    assert all(client.get('/api/assets/'+aid).status_code==200 for aid in shared_assets)
     assert client.get('/api/drafts/'+restored['id']).status_code==200
-    with store.db() as con:con.execute("UPDATE jobs SET status='running' WHERE id=?",(job['id'],))
-    store.init();assert store.job(job['id'],True)['status']=='unknown'
+    assert client.delete('/api/jobs/'+deleted['id']).status_code==404
+
+    with store.db() as con:
+        con.execute("UPDATE jobs SET status='running' WHERE id=?",(other['id'],))
+    refused=client.delete('/api/jobs/'+other['id'])
+    assert refused.status_code==409 and '执行中' in refused.json()['detail']
+    assert client.get('/api/jobs/'+other['id']).status_code==200
+    with store.db() as con:
+        con.execute("UPDATE jobs SET deleted=1 WHERE id=?",(other['id'],))
+    store.init();assert store.job(other['id'],True)['status']=='unknown'
 
 
 def test_context_crop_complete_and_only_referenced(client):

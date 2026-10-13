@@ -307,7 +307,9 @@ def detail(jid: str):
 
 @app.delete('/api/jobs/{jid}')
 def delete_history(jid: str):
-    store.job(jid)
+    job = store.job(jid)
+    if job['status'] in ('queued', 'running', 'saving'):
+        raise HTTPException(409, '任务执行中，完成后才能删除历史；删除不会取消生成')
     with store.db() as con:
         con.execute('UPDATE jobs SET deleted=1 WHERE id=?', (jid,))
     return {'ok': True}
