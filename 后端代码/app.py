@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request, UploadFile, File, HTTPException
+from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
@@ -21,6 +21,7 @@ import segmentation
 import provider
 import recognition
 import text_recognition
+import drive
 
 worker = ThreadPoolExecutor(max_workers=1, thread_name_prefix='image-jobs')
 login_attempts = {}
@@ -33,6 +34,7 @@ async def lifespan(app):
     if len(config.PASSWORD) < 6:
         raise RuntimeError('请在 .env 配置至少 6 字符 SITE_PASSWORD')
     store.init()
+    drive.init()
     with store.db() as con:
         pending = con.execute("SELECT id,status FROM jobs WHERE status IN ('queued','saving')").fetchall()
     for item in pending:
@@ -71,7 +73,7 @@ async def security(request, call_next):
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['Referrer-Policy'] = 'no-referrer'
     response.headers['X-Frame-Options'] = 'DENY'
-    response.headers['Content-Security-Policy'] = "default-src 'self'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+    response.headers['Content-Security-Policy'] = "sandbox; default-src 'none'" if path.startswith('/api/drive/files/') else "default-src 'self'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
     if path.startswith('/api/'):
         response.headers['Cache-Control'] = 'no-store'
     return response
@@ -123,6 +125,93 @@ def settings():
             'text_recognition': text_recognition.available(), 'text_recognition_engine': 'RapidOCR（本机）'}
 
 
+@app.get('/api/drive/items')
+def drive_items(parent_id: str | None = None, sort: str = 'updated', direction: str = 'desc'):
+    return drive.list_items(parent_id, sort, direction)
+
+
+@app.get('/api/drive/breadcrumbs')
+def drive_breadcrumbs(item_id: str | None = None):
+    return drive.breadcrumbs(item_id)
+
+
+@app.get('/api/drive/search')
+def drive_search(q: str = ''):
+    return drive.search(q)
+
+
+@app.get('/api/drive/storage')
+def drive_storage():
+    return drive.storage()
+
+
+@app.post('/api/drive/folders')
+async def drive_create_folder(request: Request):
+    body = await request.json()
+    return drive.create_folder(body.get('name'), body.get('parent_id'))
+
+
+@app.post('/api/drive/files')
+async def drive_upload(file: UploadFile = File(...), parent_id: str = Form('')):
+    limit = getattr(config, 'DRIVE_MAX_FILE_BYTES', drive.DEFAULT_MAX_FILE_BYTES)
+    content = await file.read(limit + 1)
+    return await run_in_threadpool(drive.create_file, file.filename, content, file.content_type, parent_id or None)
+
+
+@app.get('/api/drive/files/{item_id}')
+def drive_download(item_id: str, inline: bool = False):
+    path, mime, name = drive.file_info(item_id)
+    inline = inline and mime in {'image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/avif'}
+    return FileResponse(path, media_type=mime, filename=None if inline else name,
+                        content_disposition_type='inline' if inline else 'attachment',
+                        headers={'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "sandbox; default-src 'none'"})
+
+
+@app.post('/api/drive/import-references')
+async def drive_import_references(request: Request):
+    body = await request.json()
+    result = await run_in_threadpool(drive.import_references, body.get('ids'))
+    if body.get('pre_recognition'):
+        for item in result['succeeded']:
+            recognition.start(item['asset']['id'])
+    return JSONResponse(result, status_code=207 if result['failed'] else 200)
+
+
+@app.patch('/api/drive/items/{item_id}')
+async def drive_update(item_id: str, request: Request):
+    return drive.update(item_id, await request.json())
+
+
+def _drive_result(result):
+    return JSONResponse(result, status_code=207 if result['failed'] else 200)
+
+
+@app.post('/api/drive/move')
+async def drive_move(request: Request):
+    body = await request.json()
+    return _drive_result(drive.move(body.get('ids') or [], body.get('parent_id')))
+
+
+@app.post('/api/drive/trash')
+async def drive_trash(request: Request):
+    return _drive_result(drive.trash((await request.json()).get('ids') or []))
+
+
+@app.get('/api/drive/trash')
+def drive_trash_items():
+    return drive.list_trash()
+
+
+@app.post('/api/drive/restore')
+async def drive_restore(request: Request):
+    return _drive_result(drive.restore((await request.json()).get('ids') or []))
+
+
+@app.post('/api/drive/delete-permanent')
+async def drive_delete_permanent(request: Request):
+    return _drive_result(drive.delete_permanent((await request.json()).get('ids') or []))
+
+
 @app.post('/api/assets')
 async def upload(file: UploadFile = File(...), pre_recognition: bool = False):
     content = await file.read(20 * 1024 * 1024 + 1)
@@ -156,7 +245,7 @@ async def select(request: Request):
     if not all(isinstance(data.get(k), (int, float)) and 0 <= data[k] <= 1 for k in ('x', 'y')):
         raise HTTPException(400, '选区点在图像外')
     hit = await run_in_threadpool(segmentation.cached_hit, data['image_id'], data['x'], data['y'])
-    if hit:
+    if hit and not data.get('force_sam'):
         return {'candidates': [store.asset(hit['mask_id'])], 'elapsed_ms': 0, 'cached': True,
                 'recognition_cached': True, 'label': hit['label']}
     return await run_in_threadpool(segmentation.select, data['image_id'], data['x'], data['y'])

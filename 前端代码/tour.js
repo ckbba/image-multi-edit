@@ -1,13 +1,19 @@
-const STEPS=[
+export const TOUR_STEPS=[
  {selector:'#reference-wrap',fallback:'.reference-panel',title:'把参考元素拖到主图',body:'鼠标移到参考图上，选中想要的物品，再拖到主图要替换的位置。'},
  {selector:'#selection-bar',fallback:'.workspaces',title:'按 Tab，换一个选区',body:'没选对？把鼠标放在要选的图片上，按 Tab 换一个选区。'},
- {selector:'.recognition-toggle',fallback:'#pre-recognition',title:'想选整件物品？开启 AI 预识别',body:'开启后，后台识别图片里的物品。需要等一会儿；关闭也能选区和画笔编辑。'},
- {selector:'.model-pill',fallback:'#generation-model',title:'选一个生成模型',body:'想轻快些，选 flare；想稳准些，选 sunburst。生成前可以在这里切换。'},
- {selector:'#manual-reference',fallback:'.reference-panel',title:'没选准？用魔法画笔',body:'点击「魔法画笔」，自己圈出想要的区域。主图和参考图都能用。'},
- {selector:'.bubble-layer button,.mapping-number',fallback:'.operations',title:'点编号，告诉 AI 怎么改',body:'点击主图上的编号，写下修改要求。带黄点的编号表示已经写了要求。'},
+ {selector:'.recognition-toggle',fallback:'#pre-recognition',title:'想选整件物品？开启 AI 预识别',body:'开启后，后台识别图片里的物品；关闭也能选区和画笔编辑。'},
+ {selector:'.model-pill',fallback:'#generation-model',title:'选一个生成模型',body:'想轻快些，选 flare；想稳准些，选 sunburst。'},
+ {selector:'#manual-reference',fallback:'.reference-panel',title:'没选准？用魔法画笔',body:'点击「魔法画笔」，自己圈出想要的区域；主图和参考图都能用。'},
+ {selector:'#text-edit',fallback:'#main-wrap',title:'点击无痕改字，修改主图文字',body:'打开大图后，点击文字或用「圈选多行」选择区域；填写新文并点 ✓ 加入编辑，最后点「生成」才生效。'},
+ {selector:'.bubble-layer button,.mapping-number',fallback:'.operations',title:'点编号，告诉 AI 怎么改',body:'点击主图上的编号写修改要求，带黄点的编号表示已经填写。'},
+ {selector:'#mapping-list .mapping-edit-body',fallback:'#mapping-list',title:'填写主体名称',body:'主体名称只补充文字提示，不会新建或重新识别选区；选错时请纠正源选区。'},
+ {selector:'#mapping-list .subject-focus-toggle',fallback:'#mapping-list',title:'按需开启蒙版效果',body:'它会在实际模型参考输入里突出已选主体并压暗周边，不是把背景变透明。'},
+ {selector:'#composer-editor [data-mapping-preview]',fallback:'#composer-editor',title:'悬停查看元素输入',body:'悬停元素标记可预览这条操作的实际模型输入，不会触发识别、保存或生成。'},
+ {selector:'#composer-editor .composer-fragment.text-edit .composer-token',fallback:'#composer-editor',title:'从改字标记返回修改',body:'点击改字标记可回到对应主图文字，旁边的 × 只取消这处待生成改字。'},
  {selector:'#mention',fallback:'.requirements',title:'用 @ 引用整张参考图',body:'想参考整张图？点「@ 引用整图 / 元素」选图，再写下你想怎么改。'},
  {selector:'nav a[href="/history"]',fallback:'header nav',title:'到生成历史看结果',body:'生成后在这里看结果，也能恢复当时的编辑，或接着修改结果图。'}
 ];
+const STEPS=TOUR_STEPS;
 let index=0,root=null,target=null;
 const $=selector=>document.querySelector(selector);
 function ensureButton(){if($('#product-tour-start'))return;const button=document.createElement('button');button.id='product-tour-start';button.className='text-btn';button.type='button';button.textContent='？ 操作引导';button.onclick=startTour;$('.header-right')?.prepend(button);}

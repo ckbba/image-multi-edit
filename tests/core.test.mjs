@@ -96,11 +96,11 @@ test('legacy state gains mixed-input fields without changing old content',()=>{
  assert.notEqual(next,old);
 });
 
-test('legacy drafts default to flare while supported model selection is preserved',()=>{
- assert.equal(normalizeEditorState({}).generation_model,'gpt-image-2.5-flare-eco');
- assert.equal(normalizeEditorState({generation_model:'gpt-image-2.5-flare'}).generation_model,'gpt-image-2.5-flare-eco');
- assert.equal(normalizeEditorState({generation_model:'gpt-image-2.5-sunburst'}).generation_model,'gpt-image-2.5-sunburst-eco');
- assert.equal(normalizeEditorState({generation_model:'gpt-image-2.5-sunburst-eco'}).generation_model,'gpt-image-2.5-sunburst-eco');
+test('legacy eco drafts normalize to supported model names',()=>{
+ assert.equal(normalizeEditorState({}).generation_model,'gpt-image-2.5-flare');
+ assert.equal(normalizeEditorState({generation_model:'gpt-image-2.5-flare-eco'}).generation_model,'gpt-image-2.5-flare');
+ assert.equal(normalizeEditorState({generation_model:'gpt-image-2.5-sunburst'}).generation_model,'gpt-image-2.5-sunburst');
+ assert.equal(normalizeEditorState({generation_model:'gpt-image-2.5-sunburst-eco'}).generation_model,'gpt-image-2.5-sunburst');
 });
 
 test('composer exposes one structured entry per operation and explicit whole-image reference',()=>{
