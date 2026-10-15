@@ -485,6 +485,37 @@ def test_whole_image_only_submission_and_snapshot_restore(client):
     assert client.get('/api/jobs/'+job['id']).json()['snapshot']['state']['full_image_refs']==state['full_image_refs']
 
 
+def test_main_image_global_prompt_only_submission_compiles_and_restores(client):
+    main = upload(client)
+    state = client.post('/api/drafts').json()
+    state.update(main_image=main['id'], instructions='保留原人物姿势、构图和光影，只把整体色调改得更温暖')
+    saved = client.put('/api/drafts/'+state['id'], json=state)
+    assert saved.status_code == 200, saved.text
+    state['revision'] = saved.json()['revision']
+
+    job = submit(client, state, 'main-global-prompt-only')
+    compiled = job['snapshot']['compiled']
+    assert job['status'] == 'simulated' and job['result']['calls'] == 0
+    assert compiled['inputs'] == [main['id']]
+    assert compiled['base_input'] == {'kind':'base','input_index':1,'input_asset_id':main['id'],'label':'主图'}
+    assert 'IMAGE 1 is the user’s 主图' in compiled['prompt']
+    assert state['instructions'] in compiled['prompt']
+    restored = client.post('/api/jobs/'+job['id']+'/restore', json={}).json()
+    assert restored['instructions'] == state['instructions']
+
+
+def test_empty_main_image_submission_stays_blocked(client):
+    main = upload(client)
+    state = client.post('/api/drafts').json()
+    state.update(main_image=main['id'], instructions='   ')
+    saved = client.put('/api/drafts/'+state['id'], json=state)
+    assert saved.status_code == 200, saved.text
+    response = client.post('/api/jobs', json={'draft_id':state['id'],'revision':saved.json()['revision'],
+        'idempotency_key':'empty-main-only'})
+    assert response.status_code == 400
+    assert '至少一条' in response.json()['detail']
+
+
 def test_continue_from_result_clears_old_regions_and_references(client,monkeypatch):
     state=ready(client);state['mappings'][0]['requirement']='旧图局部要求';state['full_image_refs']=[{'id':'whole','image_id':state['references'][0],'label':'整图','purpose':'背景'}]
     # A simulated job has no output, so attach an immutable local output to exercise continuation.
@@ -635,22 +666,22 @@ def test_ocr_endpoint_reuses_image_version_cache(client, monkeypatch):
 
 def test_generation_model_allowlist_default_snapshot_restore_and_adapter(client, monkeypatch):
     state = ready(client)
-    assert state.get('generation_model') == 'gpt-image-2.5-flare-eco'
-    state['generation_model'] = 'gpt-image-2.5-sunburst-eco'
+    assert state.get('generation_model') == 'gpt-image-2.5-flare'
+    state['generation_model'] = 'gpt-image-2.5-sunburst'
     saved = client.put('/api/drafts/' + state['id'], json=state)
     assert saved.status_code == 200, saved.text
     state['revision'] = saved.json()['revision']
     job = submit(client, state, 'sunburst-model-snapshot')
-    assert job['snapshot']['model'] == 'gpt-image-2.5-sunburst-eco'
-    assert job['snapshot']['compiled']['model'] == 'gpt-image-2.5-sunburst-eco'
+    assert job['snapshot']['model'] == 'gpt-image-2.5-sunburst'
+    assert job['snapshot']['compiled']['model'] == 'gpt-image-2.5-sunburst'
     restored = client.post('/api/jobs/' + job['id'] + '/restore', json={}).json()
-    assert restored['generation_model'] == 'gpt-image-2.5-sunburst-eco'
+    assert restored['generation_model'] == 'gpt-image-2.5-sunburst'
     restored['generation_model'] = 'made-up-model'
     assert client.put('/api/drafts/' + restored['id'], json=restored).status_code == 400
 
 
 def test_live_submit_sends_selected_exact_model_to_provider(client, monkeypatch):
-    state = ready(client); state['generation_model'] = 'gpt-image-2.5-sunburst-eco'
+    state = ready(client); state['generation_model'] = 'gpt-image-2.5-sunburst'
     saved = client.put('/api/drafts/' + state['id'], json=state); state['revision'] = saved.json()['revision']
     calls = []
     monkeypatch.setattr(config, 'MODE', 'live'); monkeypatch.setattr(config, 'EXPERIMENTAL', True)
@@ -658,31 +689,31 @@ def test_live_submit_sends_selected_exact_model_to_provider(client, monkeypatch)
     monkeypatch.setattr(provider, 'call', lambda compiled: calls.append(compiled['model']) or (_ for _ in ()).throw(RuntimeError('stub stop')))
     job = submit(client, state, 'selected-model-provider-stub')
     assert job['status'] == 'unknown'
-    assert calls == ['gpt-image-2.5-sunburst-eco']
+    assert calls == ['gpt-image-2.5-sunburst']
 
 
-def test_legacy_draft_models_migrate_to_matching_eco_without_rewriting_history(client):
+def test_legacy_eco_draft_models_migrate_without_rewriting_history(client):
     state = ready(client)
-    state['generation_model'] = 'gpt-image-2.5-sunburst'
+    state['generation_model'] = 'gpt-image-2.5-sunburst-eco'
     with store.db() as con:
         con.execute('UPDATE drafts SET state=? WHERE id=?', (json.dumps(state), state['id']))
     migrated = client.get('/api/drafts/' + state['id']).json()
-    assert migrated['generation_model'] == 'gpt-image-2.5-sunburst-eco'
-    old_snapshot = {'state': state, 'compiled': {'model': 'gpt-image-2.5-sunburst', 'compiler_version': 'old'},
-                    'mode': 'simulation', 'model': 'gpt-image-2.5-sunburst', 'created': time.time()}
+    assert migrated['generation_model'] == 'gpt-image-2.5-sunburst'
+    old_snapshot = {'state': state, 'compiled': {'model': 'gpt-image-2.5-sunburst-eco', 'compiler_version': 'old'},
+                    'mode': 'simulation', 'model': 'gpt-image-2.5-sunburst-eco', 'created': time.time()}
     jid = store.uid()
     with store.db() as con:
         con.execute('INSERT INTO jobs(id,idem,created,status,snapshot,result) VALUES(?,?,?,?,?,?)',
                     (jid, 'old-history-model', time.time(), 'simulated', json.dumps(old_snapshot), '{}'))
     history = client.get('/api/jobs/' + jid).json()
-    assert history['snapshot']['model'] == 'gpt-image-2.5-sunburst'
+    assert history['snapshot']['model'] == 'gpt-image-2.5-sunburst-eco'
     restored = client.post('/api/jobs/' + jid + '/restore', json={}).json()
-    assert restored['generation_model'] == 'gpt-image-2.5-sunburst-eco'
+    assert restored['generation_model'] == 'gpt-image-2.5-sunburst'
 
 
-def test_provider_multipart_uses_exact_eco_model_image_array_and_single_output(client, monkeypatch):
+def test_provider_multipart_uses_exact_model_image_array_and_single_output(client, monkeypatch):
     state = ready(client)
-    state['generation_model'] = 'gpt-image-2.5-flare-eco'
+    state['generation_model'] = 'gpt-image-2.5-flare'
     compiled = provider.compile_request(state)
     captured = {}
     class Response:
@@ -698,12 +729,12 @@ def test_provider_multipart_uses_exact_eco_model_image_array_and_single_output(c
     monkeypatch.setattr(provider.httpx, 'Client', StubClient)
     with pytest.raises(ValueError, match='stub stop'):
         provider.call(compiled)
-    assert captured['data']['model'] == 'gpt-image-2.5-flare-eco'
+    assert captured['data']['model'] == 'gpt-image-2.5-flare'
     assert captured['data']['n'] == '1'
     assert captured['files'] and all(item[0] == 'image[]' for item in captured['files'])
 
 
-def test_runtime_legacy_model_setting_maps_to_matching_eco():
-    assert config.normalize_model_setting('gpt-image-2.5-flare') == 'gpt-image-2.5-flare-eco'
-    assert config.normalize_model_setting('gpt-image-2.5-sunburst') == 'gpt-image-2.5-sunburst-eco'
+def test_runtime_legacy_eco_model_setting_maps_to_matching_model():
+    assert config.normalize_model_setting('gpt-image-2.5-flare-eco') == 'gpt-image-2.5-flare'
+    assert config.normalize_model_setting('gpt-image-2.5-sunburst-eco') == 'gpt-image-2.5-sunburst'
     assert config.normalize_model_setting('unknown-model') == 'unknown-model'

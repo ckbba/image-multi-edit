@@ -50,3 +50,15 @@ def test_history_asset_preview_legacy_binding_without_kind_resolves_by_mapping_s
     state = "{main_image:'main',references:['src'],mappings:[{id:'m1',source:{image_id:'src'}}],full_image_refs:[]}"
     compiled = "{inputs:['main','legacy-crop'],bindings:[{mapping_id:'m1',input_index:2}]}"
     assert run_core(f"c.historyFrozenAssetEntries({state},{compiled},'src')[0].assetId") == 'legacy-crop'
+
+
+def test_generation_readiness_accepts_each_effective_edit_class_but_not_empty_main():
+    assert run_core("c.hasGenerationIntent({main_image:'m',mappings:[],text_edits:[],full_image_refs:[],instructions:'全局要求'})") is True
+    assert run_core("c.hasGenerationIntent({main_image:'m',mappings:[],text_edits:[{original_text:'A',replacement:'B'}],full_image_refs:[],instructions:''})") is True
+    assert run_core("c.hasGenerationIntent({main_image:'m',mappings:[{id:'local'}],text_edits:[],full_image_refs:[],instructions:''})") is True
+    assert run_core("c.hasGenerationIntent({main_image:'m',mappings:[],text_edits:[],full_image_refs:[],instructions:'   '})") is False
+
+
+def test_standalone_composer_text_is_merged_into_global_instructions():
+    result = run_core("c.mergeComposerGlobalText('已有全局要求',['  保留人物姿势  ','','构图和光影'])")
+    assert result == '已有全局要求\n保留人物姿势\n构图和光影'

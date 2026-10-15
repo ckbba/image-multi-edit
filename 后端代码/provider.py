@@ -104,7 +104,7 @@ def compile_request(state, strategy=None):
     inputs = [state['main_image']]
     bindings = []
     mask_asset_ids = []
-    lines = ['Edit IMAGE 1 as the base photograph. Perform all user-directed edits listed below in ONE final photograph.',
+    lines = ['IMAGE 1 is the user’s 主图 (main/base image). Edit IMAGE 1 as the base photograph. Perform all user-directed edits listed below in ONE final photograph.',
              'Preserve unrelated content unless a user requirement explicitly asks to change it.',
              'Each source belongs ONLY to its listed operation. Adapt source objects naturally to target perspective, lighting and occlusion.',
              'Coordinates below are normalized [0,1] regions in the original images, not API control parameters.',
@@ -156,7 +156,7 @@ def compile_request(state, strategy=None):
         bindings.append({'kind':'full-image','reference_id':reference['id'],'input_index':index,'original_id':reference['image_id'],'purpose':purpose})
     if state.get('instructions'):
         lines.append('Additional user requirements: ' + state['instructions'])
-    return dict(prompt='\n'.join(lines), inputs=inputs, bindings=bindings, mask_asset_ids=mask_asset_ids, strategy=strategy,
+    return dict(prompt='\n'.join(lines), inputs=inputs, base_input={'kind':'base','input_index':1,'input_asset_id':state['main_image'],'label':'主图'}, bindings=bindings, mask_asset_ids=mask_asset_ids, strategy=strategy,
                 compiler_version=COMPILER_VERSION, model=model, mask_mode='native-openai-alpha' if mask_asset_ids else 'disabled',
                 quality=os.getenv('IMAGE25_QUALITY') or None, size='auto', execution='batch-experimental')
 

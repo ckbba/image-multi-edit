@@ -18,8 +18,8 @@ load_env()
 
 def normalize_model_setting(model):
     return {
-        'gpt-image-2.5-flare': 'gpt-image-2.5-flare-eco',
-        'gpt-image-2.5-sunburst': 'gpt-image-2.5-sunburst-eco',
+        'gpt-image-2.5-flare-eco': 'gpt-image-2.5-flare',
+        'gpt-image-2.5-sunburst-eco': 'gpt-image-2.5-sunburst',
     }.get(model, model)
 
 

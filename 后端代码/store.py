@@ -144,10 +144,10 @@ COLORS = ['#8b5cf6', '#3b82f6', '#f59e0b', '#10b981', '#ec4899']
 REFERENCE_UPLOAD_LIMIT = 12
 MAPPING_DRAFT_LIMIT = 20
 MODEL_REFERENCE_LIMIT = 12
-GENERATION_MODELS = ('gpt-image-2.5-flare-eco', 'gpt-image-2.5-sunburst-eco')
+GENERATION_MODELS = ('gpt-image-2.5-flare', 'gpt-image-2.5-sunburst')
 LEGACY_GENERATION_MODELS = {
-    'gpt-image-2.5-flare': GENERATION_MODELS[0],
-    'gpt-image-2.5-sunburst': GENERATION_MODELS[1],
+    'gpt-image-2.5-flare-eco': GENERATION_MODELS[0],
+    'gpt-image-2.5-sunburst-eco': GENERATION_MODELS[1],
 }
 
 
@@ -254,8 +254,8 @@ def validate(state, for_submit=False, allow_overlap=False):
                 conflicts.append({'a': a, 'b': b, 'overlap': round(ratio, 4), 'duplicate': ratio > 0.85})
     if state.get('next_display_index', 1) <= max(numbers, default=0):
         raise HTTPException(400, '下个编号必须大于已分配编号')
-    if for_submit and (not main or (not mappings and not whole_refs and not effective_edits)):
-        raise HTTPException(400, '请准备主图和至少一条有效编辑关系、改字或整图引用')
+    if for_submit and (not main or (not mappings and not whole_refs and not effective_edits and not state.get('instructions', '').strip())):
+        raise HTTPException(400, '请准备主图和至少一条有效编辑关系、改字、整图引用或全局要求')
     actual_references = len(mappings) + len(whole_refs)
     if for_submit and actual_references > MODEL_REFERENCE_LIMIT:
         raise HTTPException(400, f'当前共 {actual_references} 个实际参考输入，最多 12 个；请删除部分元素操作或整图引用后再生成')
