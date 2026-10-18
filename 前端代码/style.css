@@ -118,3 +118,5 @@
 .history-text-region{position:absolute;pointer-events:auto;min-width:22px;min-height:22px;padding:0;border:2px solid #16a34a;border-radius:4px;background:#15803d44;color:#fff;font-size:11px;font-weight:700;text-shadow:0 1px 2px #14532d;cursor:pointer}
 .history-text-region:focus-visible{outline:3px solid #86efac;outline-offset:2px}
 
+.workspace-heading #new-draft{border:1px dashed #aa9ccd;border-radius:9px;padding:7px 11px;background:#f8f6fe;color:#5c4d96;font-weight:600}.workspace-heading #new-draft:hover{border-color:#7360ce;background:#f0ecfb}.workspace-heading #new-draft:focus-visible{outline:2px solid #7360ce;outline-offset:2px}
+
