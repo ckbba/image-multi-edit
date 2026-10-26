@@ -7,7 +7,8 @@ ROOT = Path(__file__).resolve().parents[1] / "前端代码"
 
 def run_core(expression):
     script = f"import * as c from {json.dumps((ROOT / 'core.js').as_uri())}; console.log(JSON.stringify({expression}))"
-    result = subprocess.run(["node", "--input-type=module", "-e", script], capture_output=True, text=True, check=True)
+    result = subprocess.run(["node", "--input-type=module", "-e", script], capture_output=True,
+                            text=True, encoding="utf-8", check=True)
     return json.loads(result.stdout)
 
 

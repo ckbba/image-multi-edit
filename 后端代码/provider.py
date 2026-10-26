@@ -15,7 +15,7 @@ from fastapi import HTTPException
 import config
 import store
 
-COMPILER_VERSION = 'mixed-input-v6-subject-focus'
+COMPILER_VERSION = 'mixed-input-v7-scale-aligned'
 
 
 def preflight(model=None):
@@ -47,7 +47,7 @@ def reference_input_image(mapping, strategy='context-crop'):
     source = mapping.get('source')
     if not source:
         return store.image(mapping['target']['image_id']).copy(), None, 'main-image-no-separate-reference', 'off'
-    if strategy not in ('full', 'context-crop', 'transparent'):
+    if strategy not in ('full', 'context-crop', 'transparent', 'scale-aligned'):
         raise ValueError('Unknown source strategy')
     image = store.image(source['image_id']).convert('RGBA')
     mask = store.image(source['mask_id']).getchannel('A').resize(image.size, Image.Resampling.NEAREST)
@@ -68,8 +68,29 @@ def reference_input_image(mapping, strategy='context-crop'):
         softened = Image.blend(image, neutral, .72)
         image = Image.composite(image, softened, mask)
     origin = {'image_id': source['image_id'], 'box_pixels': box, 'margin_fraction': .08,
-              'strategy': strategy, 'strategy_version': 2, 'subject_focus': focus}
-    return image.crop(box), origin, 'model-reference-input', focus
+              'strategy': strategy, 'strategy_version': 3, 'subject_focus': focus}
+    crop = image.crop(box)
+    if strategy == 'scale-aligned':
+        base = store.image(mapping['target']['image_id'])
+        target = store.asset(mapping['target']['mask_id'])['bbox']
+        factor = min(1, 1536 / max(base.size))
+        canvas_size = (max(1, round(base.width * factor)), max(1, round(base.height * factor)))
+        selected_width = max(1, (bbox[2] - bbox[0]) * image.width)
+        selected_height = max(1, (bbox[3] - bbox[1]) * image.height)
+        resize = min(max(1, (target[2] - target[0]) * canvas_size[0]) / selected_width,
+                     max(1, (target[3] - target[1]) * canvas_size[1]) / selected_height)
+        crop_size = (max(1, round(crop.width * resize)), max(1, round(crop.height * resize)))
+        resized = crop.resize(crop_size, Image.Resampling.LANCZOS)
+        canvas = Image.new('RGBA', canvas_size, (128, 128, 128, 255))
+        selected_center = ((bbox[0] + bbox[2]) * image.width / 2 - box[0],
+                           (bbox[1] + bbox[3]) * image.height / 2 - box[1])
+        target_center = ((target[0] + target[2]) * canvas_size[0] / 2,
+                         (target[1] + target[3]) * canvas_size[1] / 2)
+        canvas.alpha_composite(resized, (round(target_center[0] - selected_center[0] * resize),
+                                         round(target_center[1] - selected_center[1] * resize)))
+        origin.update(canvas_size=canvas_size, target_bbox=target, aligned_crop_size=crop_size)
+        return canvas.convert('RGB'), origin, 'model-reference-input', focus
+    return crop, origin, 'model-reference-input', focus
 
 
 def reference_input_bytes(mapping, strategy='context-crop'):
@@ -96,10 +117,9 @@ def compile_request(state, strategy=None):
     actual_references = len([m for m in state.get('mappings', []) if m.get('source')]) + len(state.get('full_image_refs', []))
     if actual_references > store.MODEL_REFERENCE_LIMIT:
         raise HTTPException(400, f'当前共 {actual_references} 个实际参考输入，最多 12 个；请删除部分元素操作或整图引用后再生成')
-    # Element bindings always use the product's context crop. Whole-image intent is
-    # represented separately by explicit full_image_refs, never by a global switch.
-    strategy = strategy or 'context-crop'
-    if strategy not in ('full', 'context-crop', 'transparent'):
+    # Legacy drafts retain context crops; newly created drafts opt in explicitly.
+    strategy = strategy or ('scale-aligned' if state.get('source_strategy') == 'scale-aligned' else 'context-crop')
+    if strategy not in ('full', 'context-crop', 'transparent', 'scale-aligned'):
         raise ValueError('Unknown source strategy')
     inputs = [state['main_image']]
     bindings = []
@@ -132,11 +152,19 @@ def compile_request(state, strategy=None):
         inputs.append(source_id)
         index = len(inputs)
         target_bbox = store.asset(tgt['mask_id'])['bbox']
+        target_width = (target_bbox[2] - target_bbox[0]) * 100
+        target_height = (target_bbox[3] - target_bbox[1]) * 100
         lines.append(f'Operation {m["display_index"]}: use the selected object {src.get("label", "")} from IMAGE {index}, '
-                     f'source region {bbox if strategy == "full" else "the central selected object in the crop"}, '
+                     f'source region {bbox if strategy == "full" else "the selected object in the derived reference"}, '
                      f'for the edit around IMAGE 1 target region {target_bbox}, '
                      f'with intended location near normalized point ({tgt["anchor"]["x"]}, {tgt["anchor"]["y"]}). '
                      + (f'User requirement: {action}. ' if action else 'Default intent: replace the selected target object with the source object. ')
+                     + f'Approximate target footprint about {target_width:.1f}% of IMAGE 1 width and {target_height:.1f}% of its height; '
+                     + 'use this as a scale guide, not a rigid boundary when the target selection is only a small contact point. '
+                     + 'Match scene perspective and neighboring object scale rather than the reference framing. '
+                     + 'For people or body parts, preserve natural head/body and limb proportions, wrist and hand size, '
+                     + 'and feet on the intended ground; do not force a full person to fit a small selection. '
+                     + ('The neutral canvas is not part of the scene. ' if strategy == 'scale-aligned' else '')
                      + ('The model reference input visually emphasizes the existing selected source mask; treat the subject name as text guidance only. ' if focus == 'selected-mask' else '')
                      + 'Do not copy the source background unless explicitly requested.')
         bindings.append({'kind':'element','mapping_id': m['id'], 'display_index': m['display_index'], 'input_index': index,
@@ -216,13 +244,14 @@ def download(url):
 
 def save_outputs(jid):
     job = store.job(jid, include_deleted=True)
+    token = store.CURRENT_USER_ID.set(job.get('user_id'))
     result = job['result']
     store.update_job(jid, 'saving', result)
     try:
         saved = list(result.get('assets', []))
         for item in result['outputs'][len(saved):]:
             content = base64.b64decode(item['b64_json'], validate=True) if item.get('b64_json') else download(item['url'])
-            meta = store.ingest(content, f'edit-{jid}.png', 'output')
+            meta = store.ingest(content, f'edit-{jid}.png', 'output', user_id=job.get('user_id'))
             saved.append(meta['id'])
             result['assets'] = saved
             store.update_job(jid, 'saving', result)
@@ -231,16 +260,21 @@ def save_outputs(jid):
     except Exception as exc:
         result['error'] = f'结果已生成但保存失败：{type(exc).__name__}；可重试保存，不会再次生图'
         store.update_job(jid, 'save_failed', result)
+    finally:
+        store.CURRENT_USER_ID.reset(token)
 
 
 def execute(jid):
     job = store.job(jid, include_deleted=True)
+    token = store.CURRENT_USER_ID.set(job.get('user_id'))
     if job['status'] != 'queued':
+        store.CURRENT_USER_ID.reset(token)
         return
     store.update_job(jid, 'running', {})
     if job['snapshot']['mode'] == 'simulation':
         store.update_job(jid, 'simulated', {'calls': 0, 'cost_usd': 0,
                      'message': '模拟检查完成：仅验证快照和持久化，未调用 Image2.5，没有生成图片。'})
+        store.CURRENT_USER_ID.reset(token)
         return
     try:
         compiled = job['snapshot']['compiled']
@@ -253,3 +287,5 @@ def execute(jid):
         store.update_job(jid, 'failed', {'error': str(exc), 'cost_usd': None})
     except Exception as exc:
         store.update_job(jid, 'unknown', {'error': f'{type(exc).__name__}：上游状态未知；请核对渠道任务，未自动重试。', 'cost_usd': None})
+    finally:
+        store.CURRENT_USER_ID.reset(token)
