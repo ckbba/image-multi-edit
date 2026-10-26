@@ -10,7 +10,7 @@
 
 ![生成结果与编辑快照](docs/screenshots/history-result.png)
 
-这是可独立运行的单使用者私有网站，包含双图编辑工作区、服务端草稿、生成历史、稳定详情地址、下载、恢复原编辑和以结果继续。真实图像编辑仅使用 **65535 / gpt-image-2.5-flare**，不会自动换模型。没有生产部署。
+这是可独立运行的多账号创作原型，包含公共灵感瀑布流、私有云盘、双图编辑工作区、服务端草稿、生成历史、下载、恢复原编辑和以结果继续。游客可浏览灵感，收藏或加入工作区时需注册/登录；用户的云盘、素材、草稿和历史按账号隔离。真实图像编辑仅使用 **65535 / gpt-image-2.5-flare**，不会自动换模型。没有生产部署。
 
 当前版本是**有真实调用证据的工程试用版**，不是完整质量验收通过版。详见 [TECH_RESEARCH.md](TECH_RESEARCH.md)、[CHECKS.md](CHECKS.md) 和 [真实图像检查](evidence/QUALITY_REVIEW.md)。
 
@@ -36,7 +36,7 @@ Windows 后台启动可运行 `powershell -ExecutionPolicy Bypass -File .\start.
 
 | 配置 | 作用 |
 |---|---|
-| `SITE_PASSWORD` | 单一授权使用者的空间密码。签发 HttpOnly 会话，资料/图片下载均需鉴权 |
+| `SITE_PASSWORD` | 旧单用户空间的兼容密码；首次升级后旧数据归入 `legacy@local.invalid`。新用户使用邮箱＋密码注册 |
 | `DATA_DIR` | 持久目录，默认项目下 `data`，必须可写 |
 | `GENERATION_MODE` | `simulation`：仅保存流程检查记录，无图像输出；`live`：真实付费生成 |
 | `IMAGE25_BASE_URL` | 65535 origin，不带 `/v1`，默认 `https://task-api-1-cn.65535.space` |

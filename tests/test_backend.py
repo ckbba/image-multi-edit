@@ -15,6 +15,7 @@ import store
 import provider
 import segmentation
 import recognition
+import auth
 from app import app
 
 
@@ -89,8 +90,8 @@ def test_research_restore_rebinds_old_serial_geometry_only_in_new_draft(client):
     snapshot={'state':state,'model':'test-model','research_case':'compare-serial-2','compiled':{'strategy':'full'}}
     jid=store.uid()
     with store.db() as con:
-        con.execute('INSERT INTO jobs(id,idem,created,status,snapshot,result) VALUES(?,?,?,?,?,?)',
-            (jid,jid,time.time(),'succeeded',json.dumps(snapshot),json.dumps({'assets':[intermediate['id']],'calls':1})))
+        con.execute('INSERT INTO jobs(id,idem,created,status,snapshot,result,user_id) VALUES(?,?,?,?,?,?,?)',
+            (jid,jid,time.time(),'succeeded',json.dumps(snapshot),json.dumps({'assets':[intermediate['id']],'calls':1}),auth.LEGACY_USER_ID))
     r=client.post('/api/jobs/'+jid+'/restore',json={})
     assert r.status_code==200,r.text
     draft=r.json();store.validate(draft,True)
@@ -160,8 +161,8 @@ def test_legacy_unknown_paid_idempotency_is_preserved(client,monkeypatch):
     snapshot={'state':state,'compiled':compiled,'mode':'live','model':config.MODEL,'created':time.time()}
     jid=store.uid()
     with store.db() as con:
-        con.execute('INSERT INTO jobs(id,idem,created,status,snapshot,result) VALUES(?,?,?,?,?,?)',
-                    (jid,'legacy-paid-key',time.time(),'unknown',json.dumps(snapshot),json.dumps({'error':'upstream unknown'})))
+        con.execute('INSERT INTO jobs(id,idem,created,status,snapshot,result,user_id) VALUES(?,?,?,?,?,?,?)',
+                    (jid,'legacy-paid-key',time.time(),'unknown',json.dumps(snapshot),json.dumps({'error':'upstream unknown'}),auth.LEGACY_USER_ID))
     monkeypatch.setattr(provider,'call',lambda compiled:calls.append(compiled))
     repeated=submit(client,state,'legacy-paid-key')
     assert repeated['id']==jid and repeated['status']=='unknown'
@@ -366,7 +367,7 @@ def test_reference_preview_bytes_equal_compiled_input_without_creating_job(clien
     before_jobs=client.get('/api/jobs').json()['items']
     with store.db() as con:
         before_assets={row['id'] for row in con.execute('SELECT id FROM assets')}
-    preview=client.post('/api/reference-preview',json={'mapping':mapping})
+    preview=client.post('/api/reference-preview',json={'mapping':mapping,'strategy':state['source_strategy']})
     assert preview.status_code==200,preview.text
     assert preview.headers['x-reference-preview-kind']=='model-reference-input'
     assert preview.headers['x-subject-focus']=='off'
@@ -378,13 +379,51 @@ def test_reference_preview_bytes_equal_compiled_input_without_creating_job(clien
     sent=client.get('/api/assets/'+compiled['bindings'][0]['input_asset_id'])
     assert preview.content==sent.content
 
+def test_scale_aligned_reference_matches_target_footprint_and_preview(client):
+    state=ready(client);state['source_strategy']='scale-aligned';mapping=state['mappings'][0]
+    preview=client.post('/api/reference-preview',json={'mapping':mapping,'strategy':'scale-aligned'})
+    assert preview.status_code==200,preview.text
+    compiled=provider.compile_request(state)
+    binding=compiled['bindings'][0]
+    assert binding['crop']['origin']['strategy']=='scale-aligned'
+    assert preview.content==client.get('/api/assets/'+binding['input_asset_id']).content
+    image=Image.open(io.BytesIO(preview.content)).convert('RGB')
+    assert image.size==(120,80)
+    assert image.getpixel((0,0))==(128,128,128)
+    assert image.getpixel((24,16))==(255,0,0)
+    assert image.getpixel((110,70))==(128,128,128)
+    assert 'neutral canvas is not part of the scene' in compiled['prompt']
+
+def test_element_prompt_uses_target_fraction_without_enforcing_human_into_small_mask(client):
+    state=ready(client);state['source_strategy']='scale-aligned'
+    state['mappings'][0]['source']['label']='男人'
+    state['mappings'][0]['requirement']='让人物站在上层平台地面抱着孩子'
+    compiled=provider.compile_request(state)
+    assert 'target footprint about 20.8% of IMAGE 1 width and 21.2% of its height' in compiled['prompt']
+    assert 'head/body and limb proportions' in compiled['prompt']
+    assert 'feet on the intended ground' in compiled['prompt']
+    assert 'do not force a full person to fit a small selection' in compiled['prompt']
+    assert compiled['bindings'][0]['target_bbox']==store.asset(state['mappings'][0]['target']['mask_id'])['bbox']
+
+def test_new_draft_defaults_to_scale_alignment_without_changing_legacy_drafts(client):
+    fresh=client.post('/api/drafts').json()
+    assert fresh['source_strategy']=='scale-aligned'
+    older=ready(client)
+    older['source_strategy']='context-crop'
+    assert provider.compile_request(older)['strategy']=='context-crop'
+
+def test_scale_aligned_preview_rejects_unknown_strategy(client):
+    state=ready(client)
+    response=client.post('/api/reference-preview',json={'mapping':state['mappings'][0],'strategy':'nonsense'})
+    assert response.status_code==400
+
 
 def test_subject_focus_is_explicit_mask_processing_and_preview_is_fresh(client):
     state=ready(client)
     mapping=state['mappings'][0]
-    raw=client.post('/api/reference-preview',json={'mapping':mapping})
+    raw=client.post('/api/reference-preview',json={'mapping':mapping,'strategy':state['source_strategy']})
     mapping['subject_focus']=True
-    focused=client.post('/api/reference-preview',json={'mapping':mapping})
+    focused=client.post('/api/reference-preview',json={'mapping':mapping,'strategy':state['source_strategy']})
     assert focused.status_code==200,focused.text
     assert focused.headers['x-subject-focus']=='selected-mask'
     assert focused.content!=raw.content
@@ -703,8 +742,8 @@ def test_legacy_eco_draft_models_migrate_without_rewriting_history(client):
                     'mode': 'simulation', 'model': 'gpt-image-2.5-sunburst-eco', 'created': time.time()}
     jid = store.uid()
     with store.db() as con:
-        con.execute('INSERT INTO jobs(id,idem,created,status,snapshot,result) VALUES(?,?,?,?,?,?)',
-                    (jid, 'old-history-model', time.time(), 'simulated', json.dumps(old_snapshot), '{}'))
+        con.execute('INSERT INTO jobs(id,idem,created,status,snapshot,result,user_id) VALUES(?,?,?,?,?,?,?)',
+                    (jid, 'old-history-model', time.time(), 'simulated', json.dumps(old_snapshot), '{}', auth.LEGACY_USER_ID))
     history = client.get('/api/jobs/' + jid).json()
     assert history['snapshot']['model'] == 'gpt-image-2.5-sunburst-eco'
     restored = client.post('/api/jobs/' + jid + '/restore', json={}).json()

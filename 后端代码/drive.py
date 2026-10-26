@@ -29,6 +29,10 @@ def init():
         CREATE INDEX IF NOT EXISTS drive_parent_idx ON drive_items(parent_id, trashed_at);
         CREATE INDEX IF NOT EXISTS drive_name_idx ON drive_items(name);
         ''')
+        columns = {row['name'] for row in con.execute('PRAGMA table_info(drive_items)')}
+        if 'user_id' not in columns:
+            con.execute('ALTER TABLE drive_items ADD COLUMN user_id TEXT')
+        con.execute('CREATE INDEX IF NOT EXISTS drive_user_parent_idx ON drive_items(user_id,parent_id,trashed_at)')
     purge_expired()
 
 
@@ -51,41 +55,43 @@ def _row(row):
     return data
 
 
-def _get(con, item_id, include_trashed=False):
+def _get(con, item_id, include_trashed=False, user_id=None):
     row = con.execute('SELECT * FROM drive_items WHERE id=?', (item_id,)).fetchone()
-    if not row or (row['trashed_at'] is not None and not include_trashed):
+    if (not row or (row['trashed_at'] is not None and not include_trashed)
+            or (user_id is not None and row['user_id'] != user_id)):
         raise HTTPException(404, '云盘项目不存在')
     return row
 
 
-def _parent(con, parent_id):
+def _parent(con, parent_id, user_id=None):
     if not parent_id:
         return None
-    row = _get(con, parent_id)
+    row = _get(con, parent_id, user_id=user_id)
     if row['kind'] != 'folder':
         raise HTTPException(400, '目标位置不是文件夹')
     return row
 
 
-def _ensure_unique(con, parent_id, name, exclude=None):
-    row = con.execute('SELECT id FROM drive_items WHERE parent_id IS ? AND name=? COLLATE NOCASE AND trashed_at IS NULL AND id IS NOT ?',
-                      (parent_id, name, exclude)).fetchone()
+def _ensure_unique(con, parent_id, name, exclude=None, user_id=None):
+    row = con.execute('''SELECT id FROM drive_items WHERE user_id IS ? AND parent_id IS ?
+                         AND name=? COLLATE NOCASE AND trashed_at IS NULL AND id IS NOT ?''',
+                      (user_id, parent_id, name, exclude)).fetchone()
     if row:
         raise HTTPException(409, f'当前位置已存在“{name}”')
 
 
-def create_folder(name, parent_id=None):
+def create_folder(name, parent_id=None, user_id=None):
     name = _clean_name(name)
     now = time.time(); item_id = uuid.uuid4().hex
     with store.db() as con:
-        _parent(con, parent_id); _ensure_unique(con, parent_id, name)
-        con.execute('INSERT INTO drive_items(id,parent_id,kind,name,created,updated) VALUES(?,?,?,?,?,?)',
-                    (item_id, parent_id, 'folder', name, now, now))
+        _parent(con, parent_id, user_id); _ensure_unique(con, parent_id, name, user_id=user_id)
+        con.execute('INSERT INTO drive_items(id,parent_id,kind,name,created,updated,user_id) VALUES(?,?,?,?,?,?,?)',
+                    (item_id, parent_id, 'folder', name, now, now, user_id))
         row = con.execute('SELECT * FROM drive_items WHERE id=?', (item_id,)).fetchone()
     return _row(row)
 
 
-def create_file(name, content, mime, parent_id=None):
+def create_file(name, content, mime, parent_id=None, user_id=None):
     name = _clean_name(name, upload=True)
     limit = getattr(config, 'DRIVE_MAX_FILE_BYTES', DEFAULT_MAX_FILE_BYTES)
     if not content:
@@ -95,13 +101,13 @@ def create_file(name, content, mime, parent_id=None):
     now = time.time(); item_id = uuid.uuid4().hex; storage_name = item_id + '.bin'
     path = config.DATA / 'drive_files' / storage_name
     with store.db() as con:
-        _parent(con, parent_id); _ensure_unique(con, parent_id, name)
+        _parent(con, parent_id, user_id); _ensure_unique(con, parent_id, name, user_id=user_id)
         temporary = path.with_suffix('.tmp')
         temporary.write_bytes(content); temporary.replace(path)
         try:
-            con.execute('''INSERT INTO drive_items(id,parent_id,kind,name,mime,size,storage_name,created,updated)
-                           VALUES(?,?,?,?,?,?,?,?,?)''',
-                        (item_id, parent_id, 'file', name, (mime or mimetypes.guess_type(name)[0] or 'application/octet-stream')[:120], len(content), storage_name, now, now))
+            con.execute('''INSERT INTO drive_items(id,parent_id,kind,name,mime,size,storage_name,created,updated,user_id)
+                           VALUES(?,?,?,?,?,?,?,?,?,?)''',
+                        (item_id, parent_id, 'file', name, (mime or mimetypes.guess_type(name)[0] or 'application/octet-stream')[:120], len(content), storage_name, now, now, user_id))
             row = con.execute('SELECT * FROM drive_items WHERE id=?', (item_id,)).fetchone()
         except BaseException:
             path.unlink(missing_ok=True)
@@ -109,23 +115,23 @@ def create_file(name, content, mime, parent_id=None):
     return _row(row)
 
 
-def list_items(parent_id=None, sort='updated', direction='desc'):
+def list_items(parent_id=None, sort='updated', direction='desc', user_id=None):
     if sort not in SORT_COLUMNS or direction not in ('asc', 'desc'):
         raise HTTPException(400, '排序参数无效')
     purge_expired()
     with store.db() as con:
-        _parent(con, parent_id)
-        rows = con.execute(f'''SELECT * FROM drive_items WHERE parent_id IS ? AND trashed_at IS NULL
-                              ORDER BY kind='folder' DESC, {SORT_COLUMNS[sort]} {direction.upper()}, id ASC''', (parent_id,)).fetchall()
+        _parent(con, parent_id, user_id)
+        rows = con.execute(f'''SELECT * FROM drive_items WHERE user_id IS ? AND parent_id IS ? AND trashed_at IS NULL
+                              ORDER BY kind='folder' DESC, {SORT_COLUMNS[sort]} {direction.upper()}, id ASC''', (user_id, parent_id)).fetchall()
     return {'items': [_row(row) for row in rows]}
 
 
-def breadcrumbs(item_id=None):
+def breadcrumbs(item_id=None, user_id=None):
     crumbs = [{'id': None, 'name': '所有文件'}]
     if not item_id:
         return {'items': crumbs}
     with store.db() as con:
-        current = _get(con, item_id); chain = []
+        current = _get(con, item_id, user_id=user_id); chain = []
         seen = set()
         while current:
             if current['id'] in seen:
@@ -146,25 +152,25 @@ def _path(con, row):
     return '/' + '/'.join(reversed(names))
 
 
-def search(query):
+def search(query, user_id=None):
     query = str(query or '').strip()
     if not query:
         return {'items': []}
     escaped = query.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
     with store.db() as con:
-        rows = con.execute("SELECT * FROM drive_items WHERE trashed_at IS NULL AND name LIKE ? ESCAPE '\\' ORDER BY updated DESC LIMIT 50", (f'%{escaped}%',)).fetchall()
+        rows = con.execute("SELECT * FROM drive_items WHERE user_id IS ? AND trashed_at IS NULL AND name LIKE ? ESCAPE '\\' ORDER BY updated DESC LIMIT 50", (user_id, f'%{escaped}%')).fetchall()
         return {'items': [{**_row(row), 'path': _path(con, row)} for row in rows]}
 
 
-def update(item_id, changes):
+def update(item_id, changes, user_id=None):
     allowed = {'name', 'favorite'}
     if not changes or set(changes) - allowed:
         raise HTTPException(400, '仅支持重命名或收藏')
     with store.db() as con:
-        row = _get(con, item_id)
+        row = _get(con, item_id, user_id=user_id)
         name = _clean_name(changes.get('name', row['name']))
         favorite = int(bool(changes.get('favorite', row['favorite'])))
-        _ensure_unique(con, row['parent_id'], name, item_id)
+        _ensure_unique(con, row['parent_id'], name, item_id, user_id)
         con.execute('UPDATE drive_items SET name=?,favorite=?,updated=? WHERE id=?', (name, favorite, time.time(), item_id))
         result = con.execute('SELECT * FROM drive_items WHERE id=?', (item_id,)).fetchone()
     return _row(result)
@@ -177,16 +183,16 @@ def _descendant_ids(con, item_id):
       SELECT id FROM tree''', (item_id,)).fetchall()]
 
 
-def move(ids, parent_id):
+def move(ids, parent_id, user_id=None):
     succeeded, failed = [], []
     with store.db() as con:
-        target = _parent(con, parent_id)
+        target = _parent(con, parent_id, user_id)
         for item_id in dict.fromkeys(ids):
             try:
-                row = _get(con, item_id)
+                row = _get(con, item_id, user_id=user_id)
                 if parent_id == item_id or (row['kind'] == 'folder' and parent_id in _descendant_ids(con, item_id)):
                     raise HTTPException(409, '不能将文件夹移动到自身或子文件夹')
-                _ensure_unique(con, parent_id, row['name'], item_id)
+                _ensure_unique(con, parent_id, row['name'], item_id, user_id)
                 con.execute('UPDATE drive_items SET parent_id=?,updated=? WHERE id=?', (parent_id, time.time(), item_id))
                 succeeded.append(item_id)
             except HTTPException as exc:
@@ -194,12 +200,12 @@ def move(ids, parent_id):
     return {'succeeded': succeeded, 'failed': failed}
 
 
-def trash(ids):
+def trash(ids, user_id=None):
     now = time.time(); succeeded, failed = [], []
     with store.db() as con:
         for item_id in dict.fromkeys(ids):
             try:
-                row = _get(con, item_id)
+                row = _get(con, item_id, user_id=user_id)
                 subtree = _descendant_ids(con, item_id)
                 placeholders = ','.join('?' * len(subtree))
                 con.execute(f'''UPDATE drive_items SET original_parent_id=CASE WHEN id=? THEN parent_id ELSE original_parent_id END,
@@ -210,27 +216,27 @@ def trash(ids):
     return {'succeeded': succeeded, 'failed': failed}
 
 
-def list_trash():
+def list_trash(user_id=None):
     purge_expired()
     with store.db() as con:
         rows = con.execute('''SELECT d.* FROM drive_items d
           LEFT JOIN drive_items p ON p.id=d.parent_id
-          WHERE d.trashed_at IS NOT NULL AND (p.id IS NULL OR p.trashed_at IS NULL)
-          ORDER BY d.trashed_at DESC''').fetchall()
+          WHERE d.user_id IS ? AND d.trashed_at IS NOT NULL AND (p.id IS NULL OR p.trashed_at IS NULL)
+          ORDER BY d.trashed_at DESC''', (user_id,)).fetchall()
     return {'items': [_row(row) for row in rows]}
 
 
-def restore(ids):
+def restore(ids, user_id=None):
     succeeded, failed = [], []
     with store.db() as con:
         for item_id in dict.fromkeys(ids):
             try:
-                row = _get(con, item_id, True)
+                row = _get(con, item_id, True, user_id)
                 if row['trashed_at'] is None: raise HTTPException(409, '项目不在回收站')
                 parent_id = row['original_parent_id']
                 parent = con.execute('SELECT * FROM drive_items WHERE id=? AND trashed_at IS NULL', (parent_id,)).fetchone() if parent_id else None
                 destination = parent_id if parent else None
-                _ensure_unique(con, destination, row['name'], item_id)
+                _ensure_unique(con, destination, row['name'], item_id, user_id)
                 subtree = _descendant_ids(con, item_id); placeholders = ','.join('?' * len(subtree))
                 con.execute(f'UPDATE drive_items SET trashed_at=NULL,purge_at=NULL WHERE id IN ({placeholders})', subtree)
                 con.execute('UPDATE drive_items SET parent_id=?,original_parent_id=NULL,updated=? WHERE id=?', (destination, time.time(), item_id))
@@ -240,12 +246,12 @@ def restore(ids):
     return {'succeeded': succeeded, 'failed': failed}
 
 
-def delete_permanent(ids):
+def delete_permanent(ids, user_id=None):
     succeeded, failed, paths = [], [], []
     with store.db() as con:
         for item_id in dict.fromkeys(ids):
             try:
-                row = _get(con, item_id, True)
+                row = _get(con, item_id, True, user_id)
                 if row['trashed_at'] is None: raise HTTPException(409, '只能永久删除回收站项目')
                 subtree = _descendant_ids(con, item_id); placeholders = ','.join('?' * len(subtree))
                 paths.extend(config.DATA / 'drive_files' / r['storage_name'] for r in con.execute(f'SELECT storage_name FROM drive_items WHERE id IN ({placeholders}) AND storage_name IS NOT NULL', subtree))
@@ -260,29 +266,29 @@ def delete_permanent(ids):
 def purge_expired():
     now = time.time()
     with store.db() as con:
-        roots = [row['id'] for row in con.execute('''SELECT d.id FROM drive_items d LEFT JOIN drive_items p ON p.id=d.parent_id
+        roots = [(row['id'], row['user_id']) for row in con.execute('''SELECT d.id,d.user_id FROM drive_items d LEFT JOIN drive_items p ON p.id=d.parent_id
           WHERE d.purge_at IS NOT NULL AND d.purge_at<=? AND (p.id IS NULL OR p.trashed_at IS NULL)''', (now,)).fetchall()]
-    if roots:
-        delete_permanent(roots)
+    for item_id, user_id in roots:
+        delete_permanent([item_id], user_id)
 
 
-def storage():
+def storage(user_id=None):
     purge_expired()
     with store.db() as con:
-        used = con.execute("SELECT COALESCE(SUM(size),0) FROM drive_items WHERE kind='file'").fetchone()[0]
+        used = con.execute("SELECT COALESCE(SUM(size),0) FROM drive_items WHERE user_id IS ? AND kind='file'", (user_id,)).fetchone()[0]
     return {'used_bytes': used, 'file_count': None}
 
 
-def file_info(item_id):
+def file_info(item_id, user_id=None):
     with store.db() as con:
-        row = _get(con, item_id)
+        row = _get(con, item_id, user_id=user_id)
         if row['kind'] != 'file': raise HTTPException(400, '文件夹不能下载')
         path = config.DATA / 'drive_files' / row['storage_name']
         if not path.is_file(): raise HTTPException(404, '文件内容不存在')
         return path, row['mime'] or 'application/octet-stream', _clean_name(row['name'])
 
 
-def import_references(ids):
+def import_references(ids, user_id=None):
     """Copy drive images into immutable editor assets; never link lifecycles."""
     if not isinstance(ids, list) or not ids or len(ids) > store.REFERENCE_UPLOAD_LIMIT:
         raise HTTPException(400, '请选择 1 至 12 张云盘图片')
@@ -291,10 +297,10 @@ def import_references(ids):
     succeeded, failed = [], []
     for item_id in ids:
         try:
-            path, mime, name = file_info(item_id)
+            path, mime, name = file_info(item_id, user_id)
             if mime not in {'image/jpeg', 'image/png', 'image/webp'}:
                 raise HTTPException(400, '仅支持静态 JPEG / PNG / WebP 图片')
-            asset = store.ingest(path.read_bytes(), name, 'image')
+            asset = store.ingest(path.read_bytes(), name, 'image', user_id=user_id)
             succeeded.append({'drive_id': item_id, 'asset': asset})
         except HTTPException as exc:
             failed.append({'drive_id': item_id, 'error': exc.detail})

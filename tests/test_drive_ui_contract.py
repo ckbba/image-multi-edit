@@ -19,7 +19,7 @@ def test_drive_nav_is_between_editor_and_history_and_keeps_brand():
 
 
 def test_drive_assets_and_routes_are_wired():
-    assert '/static/drive.css?v=drive-workspace-1' in INDEX
+    assert '/static/drive.css?v=drive-workspace-2' in INDEX
     assert "from './drive.js?v=drive-workspace-1'" in APP
     for route in ("path==='/drive/trash'", "path.startsWith('/drive/folder/')", "path==='/drive'"):
         assert route in APP

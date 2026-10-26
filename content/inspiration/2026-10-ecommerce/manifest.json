@@ -1,0 +1,106 @@
+[
+  {
+    "id": "ecommerce-serum-202610",
+    "title": "水光精华 · 冰蓝实验室",
+    "category": "美妆护肤",
+    "file": "serum.png",
+    "source": "AI original — Codex built-in imagegen, 2026-10-26",
+    "prompt": "Use case: ads-marketing. Asset type: a standalone ecommerce inspiration image for a multi-image fusion editor. Portrait 3:4. A single unbranded frosted glass skincare serum bottle with chrome dropper, on a translucent icy blue glass block in shallow water; refracted caustics, crisp droplets, soft blue backdrop, premium beauty campaign photography, centered complete product easy to replace, subtle silver highlights. One single polished finished image, photographic material realism, no collage, no text, no letters, no logos, no watermark. Clearly separated product and background suitable for replacing the hero product in an image editor.",
+    "tags": [
+      "美妆护肤",
+      "电商",
+      "商品替换参考"
+    ]
+  },
+  {
+    "id": "ecommerce-perfume-202610",
+    "title": "琥珀香水 · 沙丘日落",
+    "category": "香氛香水",
+    "file": "perfume.png",
+    "source": "AI original — Codex built-in imagegen, 2026-10-26",
+    "prompt": "Use case: ads-marketing. Asset type: a standalone ecommerce inspiration image for a multi-image fusion editor. Portrait 4:5. Single unbranded amber rectangular perfume bottle with black architectural cap on a travertine plinth amid sculptural warm sand dunes; golden-hour shadows, smoky amber glass, luxury editorial still life, hero product fully visible and easily replaceable. One single polished finished image, photographic material realism, no collage, no text, no letters, no logos, no watermark. Clearly separated product and background suitable for replacing the hero product in an image editor.",
+    "tags": [
+      "香氛香水",
+      "电商",
+      "商品替换参考"
+    ]
+  },
+  {
+    "id": "ecommerce-soda-202610",
+    "title": "青柠气泡 · 清爽夏日",
+    "category": "食品饮品",
+    "file": "soda.png",
+    "source": "AI original — Codex built-in imagegen, 2026-10-26",
+    "prompt": "Use case: ads-marketing. Asset type: a standalone ecommerce inspiration image for a multi-image fusion editor. Portrait 3:4. One unbranded matte pale lime-green beverage can centered suspended above lime slices, crisp sparkling water splash and small ice cubes, luminous green backdrop, dynamic commercial beverage photography, visually exciting but can unobscured and easy to replace. One single polished finished image, photographic material realism, no collage, no text, no letters, no logos, no watermark. Clearly separated product and background suitable for replacing the hero product in an image editor.",
+    "tags": [
+      "食品饮品",
+      "电商",
+      "商品替换参考"
+    ]
+  },
+  {
+    "id": "ecommerce-sneaker-202610",
+    "title": "轻量跑鞋 · 橙色动能",
+    "category": "鞋履箱包",
+    "file": "sneaker.png",
+    "source": "AI original — Codex built-in imagegen, 2026-10-26",
+    "prompt": "Use case: ads-marketing. Asset type: a standalone ecommerce inspiration image for a multi-image fusion editor. Landscape 4:3. One sculptural unbranded ivory and orange technical running sneaker floating diagonally over a warm orange curved studio pedestal, electric orange background, strong directional shadows, premium realistic sneaker advertisement, complete shoe visible, generous space and clean silhouette. One single polished finished image, photographic material realism, no collage, no text, no letters, no logos, no watermark. Clearly separated product and background suitable for replacing the hero product in an image editor.",
+    "tags": [
+      "鞋履箱包",
+      "电商",
+      "商品替换参考"
+    ]
+  },
+  {
+    "id": "ecommerce-bag-202610",
+    "title": "奶油手袋 · 法式午后",
+    "category": "鞋履箱包",
+    "file": "bag.png",
+    "source": "AI original — Codex built-in imagegen, 2026-10-26",
+    "prompt": "Use case: ads-marketing. Asset type: a standalone ecommerce inspiration image for a multi-image fusion editor. Portrait 4:5. Unbranded caramel leather top-handle handbag on an ivory sculptural chair beside sheer linen curtains, warm sun and olive-branch shadow across cream plaster wall, luxury fashion still life, rich leather grain, full bag unobstructed and isolated from background. One single polished finished image, photographic material realism, no collage, no text, no letters, no logos, no watermark. Clearly separated product and background suitable for replacing the hero product in an image editor.",
+    "tags": [
+      "鞋履箱包",
+      "电商",
+      "商品替换参考"
+    ]
+  },
+  {
+    "id": "ecommerce-headphones-202610",
+    "title": "银色耳机 · 未来声场",
+    "category": "数码科技",
+    "file": "headphones.png",
+    "source": "AI original — Codex built-in imagegen, 2026-10-26",
+    "prompt": "Use case: ads-marketing. Asset type: a standalone ecommerce inspiration image for a multi-image fusion editor. Square 1:1. Premium unbranded over-ear silver aluminum headphones standing on black reflective acrylic with chrome rings behind, cobalt blue rim lighting, dark navy gradient, precision realistic technology product photography, earcups and headband complete visible, refined studio lighting. One single polished finished image, photographic material realism, no collage, no text, no letters, no logos, no watermark. Clearly separated product and background suitable for replacing the hero product in an image editor.",
+    "tags": [
+      "数码科技",
+      "电商",
+      "商品替换参考"
+    ]
+  },
+  {
+    "id": "ecommerce-coffee-202610",
+    "title": "燕麦拿铁 · 晨间微光",
+    "category": "食品饮品",
+    "file": "coffee.png",
+    "source": "AI original — Codex built-in imagegen, 2026-10-26",
+    "prompt": "Use case: ads-marketing. Asset type: a standalone ecommerce inspiration image for a multi-image fusion editor. Portrait 3:4. Unbranded cream takeaway coffee cup with tan lid and blank kraft sleeve on a pale wooden pedestal, coffee beans and oat stalks placed beside it, warm brown and cream palette, slanting morning sunlight, premium cafe campaign still-life photography. One single polished finished image, photographic material realism, no collage, no text, no letters, no logos, no watermark. Clearly separated product and background suitable for replacing the hero product in an image editor.",
+    "tags": [
+      "食品饮品",
+      "电商",
+      "商品替换参考"
+    ]
+  },
+  {
+    "id": "ecommerce-lipstick-202610",
+    "title": "红丝绒唇膏 · 花瓣剧场",
+    "category": "美妆护肤",
+    "file": "lipstick.png",
+    "source": "AI original — Codex built-in imagegen, 2026-10-26",
+    "prompt": "Use case: ads-marketing. Asset type: a standalone ecommerce inspiration image for a multi-image fusion editor. Portrait 4:5. One open unbranded satin red lipstick in elegant black metal case on folded dark burgundy silk, two red rose petals, focused warm spotlight and luxurious deep shadows, premium macro cosmetic campaign photography, whole product visible, high contrast red black composition. One single polished finished image, photographic material realism, no collage, no text, no letters, no logos, no watermark. Clearly separated product and background suitable for replacing the hero product in an image editor.",
+    "tags": [
+      "美妆护肤",
+      "电商",
+      "商品替换参考"
+    ]
+  }
+]

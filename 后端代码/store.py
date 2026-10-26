@@ -1,4 +1,4 @@
-"""One-owner durable SQLite metadata and immutable image bytes."""
+"""Durable SQLite metadata and immutable image bytes."""
 import hashlib
 import io
 import json
@@ -6,6 +6,7 @@ import sqlite3
 import time
 import uuid
 from contextlib import contextmanager
+from contextvars import ContextVar
 from pathlib import Path
 
 import numpy as np
@@ -14,6 +15,8 @@ from fastapi import HTTPException
 import config
 
 Image.MAX_IMAGE_PIXELS = 40_000_000
+CURRENT_USER_ID = ContextVar('current_user_id', default=None)
+_CONTEXT_USER = object()
 
 
 def uid():
@@ -27,6 +30,16 @@ def idempotency_scope(user_key, mode, model, compiler_version):
     return 'v2:' + hashlib.sha256(payload.encode()).hexdigest()
 
 
+def user_idempotency_scope(user_id, user_key, mode, model, compiler_version):
+    return idempotency_scope(f'{user_id}:{user_key}', mode, model, compiler_version)
+
+
+def _add_column(con, table, definition):
+    name = definition.split()[0]
+    if name not in {row['name'] for row in con.execute(f'PRAGMA table_info({table})')}:
+        con.execute(f'ALTER TABLE {table} ADD COLUMN {definition}')
+
+
 def init():
     config.DATA.mkdir(parents=True, exist_ok=True)
     (config.DATA / 'assets').mkdir(exist_ok=True)
@@ -38,7 +51,18 @@ def init():
           status TEXT NOT NULL, snapshot TEXT NOT NULL, result TEXT NOT NULL DEFAULT '{}', deleted INTEGER NOT NULL DEFAULT 0,
           display_name TEXT);
         CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY, expires REAL NOT NULL);
+        CREATE TABLE IF NOT EXISTS users(
+          id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+          password_hash TEXT NOT NULL, created REAL NOT NULL);
         ''')
+        _add_column(con, 'assets', 'user_id TEXT')
+        _add_column(con, 'drafts', 'user_id TEXT')
+        _add_column(con, 'jobs', 'user_id TEXT')
+        _add_column(con, 'sessions', 'user_id TEXT')
+        _add_column(con, 'users', "role TEXT NOT NULL DEFAULT 'user'")
+        con.execute('CREATE INDEX IF NOT EXISTS assets_user_idx ON assets(user_id)')
+        con.execute('CREATE INDEX IF NOT EXISTS drafts_user_idx ON drafts(user_id,updated DESC)')
+        con.execute('CREATE INDEX IF NOT EXISTS jobs_user_idx ON jobs(user_id,created DESC)')
         columns = {row['name'] for row in con.execute('PRAGMA table_info(jobs)')}
         if 'display_name' not in columns:
             con.execute('ALTER TABLE jobs ADD COLUMN display_name TEXT')
@@ -61,23 +85,36 @@ def db():
         con.close()
 
 
-def asset(asset_id):
+def asset_owner(asset_id):
     with db() as con:
-        row = con.execute('SELECT meta FROM assets WHERE id=?', (asset_id,)).fetchone()
+        row = con.execute('SELECT user_id FROM assets WHERE id=?', (asset_id,)).fetchone()
+    return row['user_id'] if row else None
+
+
+def asset(asset_id, user_id=_CONTEXT_USER):
+    if user_id is _CONTEXT_USER:
+        user_id = CURRENT_USER_ID.get()
+    with db() as con:
+        row = con.execute('SELECT meta,user_id FROM assets WHERE id=?', (asset_id,)).fetchone()
     if not row:
         raise HTTPException(404, '素材不存在或已损坏')
-    meta = json.loads(row['meta'])
+    parsed = json.loads(row['meta'])
+    if user_id is not None and row['user_id'] != user_id and parsed.get('kind') != 'inspiration':
+        raise HTTPException(404, '素材不存在或已损坏')
+    meta = parsed
     if not (config.DATA / meta['path']).is_file():
         raise HTTPException(409, '素材文件缺失，不能继续使用旧选区')
     return meta
 
 
-def image(asset_id):
-    return Image.open(config.DATA / asset(asset_id)['path'])
+def image(asset_id, user_id=_CONTEXT_USER):
+    return Image.open(config.DATA / asset(asset_id, user_id)['path'])
 
 
-def persist_image(im, name, kind='image', origin=None):
+def persist_image(im, name, kind='image', origin=None, user_id=_CONTEXT_USER):
     """Every asset is a new immutable version. PNG normalization removes EXIF location data."""
+    if user_id is _CONTEXT_USER:
+        user_id = CURRENT_USER_ID.get()
     im.load()
     im = im.convert('RGBA' if im.mode == 'RGBA' else 'RGB')
     buf = io.BytesIO()
@@ -92,15 +129,19 @@ def persist_image(im, name, kind='image', origin=None):
     thumb = im.copy()
     thumb.thumbnail((360, 360))
     thumb.save(config.DATA / f'assets/{aid}.thumb.png')
+    if user_id is None and isinstance(origin, dict) and origin.get('image_id'):
+        user_id = asset_owner(origin['image_id'])
     meta = dict(id=aid, version=1, width=im.width, height=im.height, name=name[:160],
                 mime='image/png', path=relative, kind=kind, origin=origin, created=time.time(),
                 sha256=hashlib.sha256(content).hexdigest(), bytes=len(content))
     with db() as con:
-        con.execute('INSERT INTO assets VALUES(?,?)', (aid, json.dumps(meta)))
+        con.execute('INSERT INTO assets(id,meta,user_id) VALUES(?,?,?)', (aid, json.dumps(meta), user_id))
     return meta
 
 
-def ingest(content, name, kind='image'):
+def ingest(content, name, kind='image', user_id=_CONTEXT_USER):
+    if user_id is _CONTEXT_USER:
+        user_id = CURRENT_USER_ID.get()
     if not content or len(content) > 20 * 1024 * 1024:
         raise HTTPException(400, '单张图片必须在 20 MB 以内')
     try:
@@ -113,17 +154,20 @@ def ingest(content, name, kind='image'):
         im.load()
     except Exception as exc:
         raise HTTPException(400, '图片无效、动画或超过像素上限') from exc
-    return persist_image(im, name, kind)
+    return persist_image(im, name, kind, user_id=user_id)
 
 
-def mask_asset(mask, image_id, method, extra=None):
-    original = asset(image_id)
+def mask_asset(mask, image_id, method, extra=None, user_id=_CONTEXT_USER):
+    if user_id is _CONTEXT_USER:
+        user_id = CURRENT_USER_ID.get()
+    original = asset(image_id, user_id)
+    user_id = user_id if user_id is not None else asset_owner(image_id)
     mask = mask.convert('L').resize((original['width'], original['height']), Image.Resampling.NEAREST)
     if not mask.getbbox():
         raise HTTPException(400, '选区为空，请重新选择')
     rgba = Image.new('RGBA', mask.size, (255, 255, 255, 0))
     rgba.putalpha(mask)
-    meta = persist_image(rgba, 'selection.png', 'mask', dict(image_id=image_id, image_version=1, method=method, **(extra or {})))
+    meta = persist_image(rgba, 'selection.png', 'mask', dict(image_id=image_id, image_version=1, method=method, **(extra or {})), user_id=user_id)
     bbox = mask.getbbox()
     meta['bbox'] = [bbox[0] / mask.width, bbox[1] / mask.height, bbox[2] / mask.width, bbox[3] / mask.height]
     with db() as con:
@@ -131,13 +175,15 @@ def mask_asset(mask, image_id, method, extra=None):
     return meta
 
 
-def manual_mask(image_id, points):
-    im = asset(image_id)
+def manual_mask(image_id, points, user_id=_CONTEXT_USER):
+    if user_id is _CONTEXT_USER:
+        user_id = CURRENT_USER_ID.get()
+    im = asset(image_id, user_id)
     if not 3 <= len(points) <= 500 or any(len(p) != 2 or not all(isinstance(v, (int, float)) and 0 <= v <= 1 for v in p) for p in points):
         raise HTTPException(400, '圈选至少需要三个有效点')
     mask = Image.new('L', (im['width'], im['height']))
     ImageDraw.Draw(mask).polygon([(round(x * (im['width'] - 1)), round(y * (im['height'] - 1))) for x, y in points], fill=255)
-    return mask_asset(mask, image_id, 'manual-polygon', {'points': points})
+    return mask_asset(mask, image_id, 'manual-polygon', {'points': points}, user_id=user_id)
 
 
 COLORS = ['#8b5cf6', '#3b82f6', '#f59e0b', '#10b981', '#ec4899']
@@ -174,7 +220,7 @@ def validate(state, for_submit=False, allow_overlap=False):
         raise HTTPException(400, '最多 20 条元素草稿')
     if len(state.get('instructions', '')) > 2000 or len(state.get('name', '')) > 100:
         raise HTTPException(400, '项目名或补充要求过长')
-    if state.get('source_strategy', 'full') not in ('full', 'context-crop', 'transparent'):
+    if state.get('source_strategy', 'full') not in ('full', 'context-crop', 'transparent', 'scale-aligned'):
         raise HTTPException(400, '请选择完整参考图或带上下文裁剪')
     if state.get('generation_model', DEFAULT_GENERATION_MODEL) not in GENERATION_MODELS:
         raise HTTPException(400, '请选择受支持的生成模型')
@@ -272,9 +318,9 @@ def normalize_draft_state(state):
     return state
 
 
-def new_draft(state=None):
+def new_draft(state=None, user_id=None):
     state = normalize_draft_state(json.loads(json.dumps(state))) if state else dict(schema_version=3, name='未命名编辑', main_image=None,
-        references=[], mappings=[], text_edits=[], full_image_refs=[], next_display_index=1, instructions='', source_strategy='context-crop')
+        references=[], mappings=[], text_edits=[], full_image_refs=[], next_display_index=1, instructions='', source_strategy='scale-aligned')
     state['id'] = uid()
     state['project_id'] = state.get('project_id', uid())
     state['revision'] = 0
@@ -287,14 +333,17 @@ def new_draft(state=None):
     state.setdefault('generation_model', DEFAULT_GENERATION_MODEL)
     state.setdefault('next_display_index', max([m['display_index'] for m in state.get('mappings', [])], default=0) + 1)
     with db() as con:
-        con.execute('INSERT INTO drafts VALUES(?,?,?,?)', (state['id'], 0, time.time(), json.dumps(state)))
+        con.execute('INSERT INTO drafts(id,revision,updated,state,user_id) VALUES(?,?,?,?,?)',
+                    (state['id'], 0, time.time(), json.dumps(state), user_id))
     return state
 
 
-def job(jid, include_deleted=False):
+def job(jid, include_deleted=False, user_id=None):
     with db() as con:
         row = con.execute('SELECT * FROM jobs WHERE id=?', (jid,)).fetchone()
     if not row or (row['deleted'] and not include_deleted):
+        raise HTTPException(404, '历史不存在')
+    if user_id is not None and row['user_id'] != user_id:
         raise HTTPException(404, '历史不存在')
     result = dict(row)
     result['snapshot'] = json.loads(row['snapshot'])
