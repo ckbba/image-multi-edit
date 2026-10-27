@@ -31,7 +31,15 @@ def test_auth_dialog_close_bypasses_validation_and_cancels_pending_action():
     assert 'class="auth-close" type="button" aria-label="关闭"' in APP
     assert "dialog.querySelector('.auth-close').onclick=()=>{pendingAuthAction=null;dialog.close('cancel');}" in APP
     assert "dialog.addEventListener('cancel',()=>{pendingAuthAction=null;});" in APP
-    assert '/static/app.js?v=accounts-5' in INDEX
+    assert '/static/app.js?v=accounts-7' in INDEX
+
+
+def test_email_verification_and_password_recovery_ui_are_wired():
+    for token in ("/verify-email", "/resend-verification", "/request-password-reset", "/reset-password"):
+        assert token in APP
+    assert '忘记密码？' in APP
+    assert '获取验证码' in APP
+    assert "'/verify-email-code'" in APP
 
 
 def test_masonry_and_mobile_layout_are_wired():

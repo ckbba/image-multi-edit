@@ -121,3 +121,6 @@
 
 .workspace-heading #new-draft{border:1px dashed #aa9ccd;border-radius:9px;padding:7px 11px;background:#f8f6fe;color:#5c4d96;font-weight:600}.workspace-heading #new-draft:hover{border-color:#7360ce;background:#f0ecfb}.workspace-heading #new-draft:focus-visible{outline:2px solid #7360ce;outline-offset:2px}
 
+.auth-forgot,.auth-resend{border:0;background:transparent;color:#7160b6;margin:-5px 0 0}.auth-resend{margin:0 auto}.auth-dialog form>p b{color:#51465b;overflow-wrap:anywhere}
+.auth-code-row{display:grid;grid-template-columns:1fr auto;gap:8px}.auth-code-row button{border:1px solid #cfc6ed;border-radius:10px;padding:0 14px;background:#f6f3ff;color:#6f59d9;white-space:nowrap}.auth-code-row button:disabled{opacity:.55}.auth-code-row input{min-width:0;letter-spacing:2px}
+

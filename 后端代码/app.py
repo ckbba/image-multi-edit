@@ -28,6 +28,8 @@ import inspiration_admin
 
 worker = ThreadPoolExecutor(max_workers=1, thread_name_prefix='image-jobs')
 login_attempts = {}
+mail_attempts = {}
+verification_attempts = {}
 
 
 @asynccontextmanager
@@ -67,7 +69,8 @@ async def security(request, call_next):
             return JSONResponse({'detail': '跨站请求被拒绝'}, status_code=403)
         if request.headers.get('sec-fetch-site') == 'cross-site':
             return JSONResponse({'detail': '跨站请求被拒绝'}, status_code=403)
-    public = (path in ('/api/login', '/api/register', '/api/health', '/api/me') or path == '/api/inspiration'
+    public = (path in ('/api/login', '/api/register', '/api/verify-email', '/api/verify-email-code', '/api/resend-verification',
+                       '/api/request-password-reset', '/api/reset-password', '/api/health', '/api/me') or path == '/api/inspiration'
               or (request.method in ('GET', 'HEAD') and path.startswith('/api/inspiration/') and path.endswith('/image')))
     user = auth.session_user(request.cookies.get('editor_session', ''))
     request.state.user = user
@@ -119,11 +122,84 @@ async def login(request: Request):
 @app.post('/api/register')
 async def register(request: Request):
     data = await request.json()
+    if config.EMAIL_VERIFICATION_REQUIRED and not config.mail_ready():
+        raise HTTPException(503, '邮箱验证服务尚未配置，暂时无法注册')
+    if config.EMAIL_VERIFICATION_REQUIRED:
+        check_mail_rate_limit(request, 'register', data.get('email'))
+        user = auth.begin_registration(data.get('email'), data.get('password'))
+        try:
+            await run_in_threadpool(auth.send_verification_code, user['id'], user['email'])
+        except Exception:
+            raise HTTPException(502, '验证码邮件发送失败，请稍后重试')
+        return JSONResponse({'ok': True, 'pending_verification': True, 'email': user['email']}, status_code=202)
     user = auth.create_user(data.get('email'), data.get('password'))
     token = auth.create_session(user['id'])
     response = JSONResponse({'ok': True, 'user': user}, status_code=201)
     response.set_cookie('editor_session', token, httponly=True, secure=os.getenv('COOKIE_SECURE') == 'true', samesite='lax', max_age=auth.SESSION_SECONDS)
     return response
+
+
+def check_mail_rate_limit(request, action, email):
+    key = (request.client.host, action, str(email or '').strip().lower())
+    now = time.time()
+    previous = mail_attempts.get(key, 0)
+    if now - previous < 60:
+        raise HTTPException(429, '请等一分钟后再试')
+    mail_attempts[key] = now
+
+
+@app.post('/api/resend-verification')
+async def resend_verification(request: Request):
+    data = await request.json()
+    check_mail_rate_limit(request, 'verify', data.get('email'))
+    if config.EMAIL_VERIFICATION_REQUIRED and config.mail_ready():
+        await run_in_threadpool(auth.resend_verification, data.get('email'))
+    return {'ok': True, 'message': '如果该邮箱存在且未验证，新邮件已发送'}
+
+
+@app.post('/api/verify-email')
+async def verify_email(request: Request):
+    user = auth.verify_email((await request.json()).get('token'))
+    token = auth.create_session(user['id'])
+    response = JSONResponse({'ok': True, 'user': user})
+    response.set_cookie('editor_session', token, httponly=True, secure=os.getenv('COOKIE_SECURE') == 'true', samesite='lax', max_age=auth.SESSION_SECONDS)
+    return response
+
+
+@app.post('/api/verify-email-code')
+async def verify_email_code(request: Request):
+    data = await request.json()
+    key = (request.client.host, str(data.get('email') or '').strip().lower())
+    now = time.time()
+    attempts = [item for item in verification_attempts.get(key, []) if now - item < 600]
+    if len(attempts) >= 5:
+        raise HTTPException(429, '验证码错误次数过多，请 10 分钟后重试')
+    try:
+        user = auth.verify_email_code(data.get('email'), data.get('code'))
+    except HTTPException:
+        verification_attempts[key] = attempts + [now]
+        raise
+    verification_attempts.pop(key, None)
+    token = auth.create_session(user['id'])
+    response = JSONResponse({'ok': True, 'user': user})
+    response.set_cookie('editor_session', token, httponly=True, secure=os.getenv('COOKIE_SECURE') == 'true', samesite='lax', max_age=auth.SESSION_SECONDS)
+    return response
+
+
+@app.post('/api/request-password-reset')
+async def request_password_reset(request: Request):
+    data = await request.json()
+    check_mail_rate_limit(request, 'reset', data.get('email'))
+    if config.mail_ready():
+        await run_in_threadpool(auth.request_password_reset, data.get('email'))
+    return {'ok': True, 'message': '如果该邮箱已注册，重置邮件已发送'}
+
+
+@app.post('/api/reset-password')
+async def reset_password(request: Request):
+    data = await request.json()
+    auth.reset_password(data.get('token'), data.get('password'))
+    return {'ok': True}
 
 
 @app.post('/api/logout')

@@ -60,9 +60,16 @@ def init():
         _add_column(con, 'jobs', 'user_id TEXT')
         _add_column(con, 'sessions', 'user_id TEXT')
         _add_column(con, 'users', "role TEXT NOT NULL DEFAULT 'user'")
+        # Existing accounts predate email verification and remain trusted.
+        _add_column(con, 'users', 'email_verified INTEGER NOT NULL DEFAULT 1')
+        con.execute('''CREATE TABLE IF NOT EXISTS auth_tokens(
+          token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL, purpose TEXT NOT NULL,
+          expires REAL NOT NULL, created REAL NOT NULL,
+          FOREIGN KEY(user_id) REFERENCES users(id))''')
         con.execute('CREATE INDEX IF NOT EXISTS assets_user_idx ON assets(user_id)')
         con.execute('CREATE INDEX IF NOT EXISTS drafts_user_idx ON drafts(user_id,updated DESC)')
         con.execute('CREATE INDEX IF NOT EXISTS jobs_user_idx ON jobs(user_id,created DESC)')
+        con.execute('CREATE INDEX IF NOT EXISTS auth_tokens_user_idx ON auth_tokens(user_id,purpose)')
         columns = {row['name'] for row in con.execute('PRAGMA table_info(jobs)')}
         if 'display_name' not in columns:
             con.execute('ALTER TABLE jobs ADD COLUMN display_name TEXT')
