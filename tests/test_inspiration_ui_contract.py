@@ -31,7 +31,7 @@ def test_auth_dialog_close_bypasses_validation_and_cancels_pending_action():
     assert 'class="auth-close" type="button" aria-label="关闭"' in APP
     assert "dialog.querySelector('.auth-close').onclick=()=>{pendingAuthAction=null;dialog.close('cancel');}" in APP
     assert "dialog.addEventListener('cancel',()=>{pendingAuthAction=null;});" in APP
-    assert '/static/app.js?v=history-text-regions-1' in INDEX
+    assert '/static/app.js?v=text-marker-center-1' in INDEX
     assert '/static/account.css?v=3' in INDEX
 
 

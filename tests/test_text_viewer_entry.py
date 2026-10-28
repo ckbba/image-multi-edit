@@ -62,3 +62,10 @@ def test_saved_text_chip_opens_viewer_with_initial_bubble_and_region_focus():
     assert "options.textEdit?.initial&&!initialTextOpened" in viewer
     assert "focusTextItem(options.textEdit.initial?.item||textHover)" in viewer
     assert "data-text-bubble-close aria-label=\"关闭改字框\"" in app
+
+
+def test_saved_text_click_uses_polygon_and_square_marker():
+    viewer = (ROOT / "viewer.js").read_text(encoding="utf-8")
+    assert "exact=findTextRegion(edits" in viewer
+    assert "savedEdit=savedTextAt(pos)" in viewer
+    assert "ctx.fillRect(marker.left,marker.top,marker.size,marker.size)" in viewer

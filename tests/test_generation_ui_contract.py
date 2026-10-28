@@ -31,7 +31,13 @@ def test_history_comparison_never_reveals_edit_annotations():
     assert 'historyBubbles.hidden=historyTextLayer.hidden=!regionsVisible' in APP
     assert 'if(regionPanel.hidden||Number(regionSelect?.value)!==mainRegionIndex||!historyTextEdits.length)' in APP
     assert 'const geometry=textEditOverlayGeometry(edit)' in APP
-    assert 'clipPath:geometry.polygon' in APP
+    assert 'shape.style.clipPath=geometry.polygon' in APP
+
+
+def test_history_text_regions_use_distinct_square_number_markers():
+    assert "marker.className='history-text-marker'" in APP
+    assert "shape.className='history-text-region-shape'" in APP
+    assert 'anchor=textEditMarkerAnchor(edit)' in APP
 
 
 def test_mapping_hover_compares_selected_object_with_truthful_model_input():

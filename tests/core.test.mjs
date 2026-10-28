@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {imageRect,referenceImageRect,detectedSelectionStatus,toImage,createMapping,createMainEditMapping,createMainEditTransient,commitMainEditTransient,addMapping,removeEmptyDraftMapping,consumePreviewSuppression,SerialActionQueue,UndoStack,LatestRequest,COLORS,normalizeEditorState,applyRecognizedLabel,composerMappingToken,mappingPreviewAssets,mappingPreviewKey,historyFrozenMappingInput,historySelectedPreviewAssets,historyDayKey,historyDayLabel,mergeHistoryItems,updateMappingLabel,composerEntries,confirmRequirement,cancelRequirementDraft,composerFragmentText,applyComposerFragment,retryTransient,REFERENCE_UPLOAD_LIMIT,MAPPING_DRAFT_LIMIT,MODEL_REFERENCE_LIMIT,generationReferenceCount,assertGenerationReferenceLimit,candidateSide,isEditableTarget,imageFilesFromTransfer,dragPreviewSize,paintMaskedDragPreview,createTextEdit,createGroupedTextEdit,textEditOverlayGeometry,selectTextLinesInPolygon,upsertTextEdit,modifiedTextEdits,replaceMainImage,findTextRegion,mergeTypedCandidates,nextTypedCandidate,isEffectiveTextEdit} from '../前端代码/core.js';
+import {imageRect,referenceImageRect,detectedSelectionStatus,toImage,createMapping,createMainEditMapping,createMainEditTransient,commitMainEditTransient,addMapping,removeEmptyDraftMapping,consumePreviewSuppression,SerialActionQueue,UndoStack,LatestRequest,COLORS,normalizeEditorState,applyRecognizedLabel,composerMappingToken,mappingPreviewAssets,mappingPreviewKey,historyFrozenMappingInput,historySelectedPreviewAssets,historyDayKey,historyDayLabel,mergeHistoryItems,updateMappingLabel,composerEntries,confirmRequirement,cancelRequirementDraft,composerFragmentText,applyComposerFragment,retryTransient,REFERENCE_UPLOAD_LIMIT,MAPPING_DRAFT_LIMIT,MODEL_REFERENCE_LIMIT,generationReferenceCount,assertGenerationReferenceLimit,candidateSide,isEditableTarget,imageFilesFromTransfer,dragPreviewSize,paintMaskedDragPreview,createTextEdit,createGroupedTextEdit,textEditOverlayGeometry,textEditMarkerAnchor,selectTextLinesInPolygon,upsertTextEdit,modifiedTextEdits,replaceMainImage,findTextRegion,mergeTypedCandidates,nextTypedCandidate,isEffectiveTextEdit} from '../前端代码/core.js';
 
 test('letterbox coordinates remain stable across viewport sizes; margins reject points',()=>{
  for(const [w,h] of [[500,400],[200,700],[1200,500]]){const r=imageRect(w,h,1200,800);const p=toImage(r.x+r.width*.25,r.y+r.height*.75,r);assert.ok(Math.abs(p.x-.25)<1e-10);assert.ok(Math.abs(p.y-.75)<1e-10);assert.equal(toImage(r.x-1,r.y,r),null);}
@@ -184,6 +184,13 @@ test('waiting text overlay uses the saved polygon instead of its oversized bbox'
  const fallback=textEditOverlayGeometry({bbox:[.1,.2,.4,.3]});
  assert.equal(fallback.source,'bbox');
  assert.equal(fallback.polygon,'polygon(0.000% 0.000%,100.000% 0.000%,100.000% 100.000%,0.000% 100.000%)');
+});
+
+test('text number marker uses the polygon center instead of the bbox corner',()=>{
+ const edit={bbox:[.01,.32,.64,.92],polygon:[[.01,.76],[.56,.62],[.63,.78],[.08,.92]]},anchor=textEditMarkerAnchor(edit);
+ assert.ok(Math.abs(anchor.x-.32)<1e-12);
+ assert.ok(Math.abs(anchor.y-.77)<1e-12);
+ assert.equal(findTextRegion([edit],anchor),edit);
 });
 
 test('main hover selection stays transient until non-empty text is confirmed',()=>{

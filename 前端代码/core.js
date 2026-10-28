@@ -16,6 +16,12 @@ export function textEditOverlayGeometry(edit){
   const polygon=normalized.map(([x,y])=>`${((x-left)/width*100).toFixed(3)}% ${((y-top)/height*100).toFixed(3)}%`).join(',');
   return {left,top,width,height,polygon:`polygon(${polygon})`,source:savedPolygon.length>=3?'polygon':'bbox'};
 }
+export function textEditMarkerAnchor(edit){
+  const bbox=Array.isArray(edit?.bbox)&&edit.bbox.length===4?edit.bbox.map(Number):null,saved=Array.isArray(edit?.polygon)?edit.polygon.filter(point=>Array.isArray(point)&&point.length===2&&point.every(Number.isFinite)):[],points=saved.length>=3?saved:bbox?[[bbox[0],bbox[1]],[bbox[2],bbox[1]],[bbox[2],bbox[3]],[bbox[0],bbox[3]]]:[];
+  if(points.length<3)return null;
+  const center=points.reduce((sum,[x,y])=>[sum[0]+x/points.length,sum[1]+y/points.length],[0,0]);
+  return {x:center[0],y:center[1]};
+}
 export const hasGenerationIntent=state=>!!((state.mappings?.length||0)||(state.full_image_refs?.length||0)||modifiedTextEdits(state).length||String(state.instructions||'').trim());
 export function mergeComposerGlobalText(current,standalone=[]){const lines=[String(current||''),...standalone].flatMap(text=>String(text||'').split('\n')).map(text=>text.trim()).filter(Boolean);return [...new Set(lines)].join('\n').slice(0,2000);}
 export function assertGenerationReferenceLimit(state){const count=generationReferenceCount(state);if(count>MODEL_REFERENCE_LIMIT)throw new Error(`当前共 ${count} 个实际参考输入，最多 ${MODEL_REFERENCE_LIMIT} 个；请删除部分元素操作或整图引用后再生成`);return count;}
