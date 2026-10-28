@@ -67,6 +67,8 @@ def create_user(email, password):
         verified = 0 if config.EMAIL_VERIFICATION_REQUIRED else 1
         con.execute("INSERT INTO users(id,email,password_hash,created,email_verified) VALUES(?,?,?,?,?)",
                     (user_id, email, _password_hash(password), now, verified))
+        con.execute("INSERT INTO credit_ledger(id,user_id,amount,kind,note,created) VALUES(?,?,?,?,?,?)",
+                    (store.uid(), user_id, 100, 'welcome', '新用户注册赠送', now))
     return {"id": user_id, "email": email, "role": "user", "email_verified": bool(verified)}
 
 
@@ -86,6 +88,8 @@ def begin_registration(email, password):
             user_id = store.uid()
             con.execute("INSERT INTO users(id,email,password_hash,created,email_verified) VALUES(?,?,?,?,0)",
                         (user_id, email, _password_hash(password), now))
+            con.execute("INSERT INTO credit_ledger(id,user_id,amount,kind,note,created) VALUES(?,?,?,?,?,?)",
+                        (store.uid(), user_id, 100, 'welcome', '新用户注册赠送', now))
     return {"id": user_id, "email": email, "role": "user", "email_verified": False}
 
 
@@ -223,8 +227,11 @@ def bootstrap_legacy(password):
     email = "legacy@local.invalid"
     with store.db() as con:
         if not con.execute("SELECT 1 FROM users WHERE id=?", (LEGACY_USER_ID,)).fetchone():
+            now = time.time()
             con.execute("INSERT INTO users(id,email,password_hash,created) VALUES(?,?,?,?)",
-                        (LEGACY_USER_ID, email, _password_hash(password), time.time()))
+                        (LEGACY_USER_ID, email, _password_hash(password), now))
+            con.execute("INSERT INTO credit_ledger(id,user_id,amount,kind,note,created) VALUES(?,?,?,?,?,?)",
+                        (store.uid(), LEGACY_USER_ID, 100, 'welcome', '新用户注册赠送', now))
         for table in ("drafts", "jobs", "drive_items"):
             exists = con.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)).fetchone()
             if exists:

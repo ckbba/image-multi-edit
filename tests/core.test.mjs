@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {imageRect,referenceImageRect,detectedSelectionStatus,toImage,createMapping,createMainEditMapping,createMainEditTransient,commitMainEditTransient,addMapping,removeEmptyDraftMapping,consumePreviewSuppression,SerialActionQueue,UndoStack,LatestRequest,COLORS,normalizeEditorState,applyRecognizedLabel,composerMappingToken,mappingPreviewAssets,mappingPreviewKey,historyFrozenMappingInput,historySelectedPreviewAssets,historyDayKey,historyDayLabel,mergeHistoryItems,updateMappingLabel,composerEntries,confirmRequirement,cancelRequirementDraft,composerFragmentText,applyComposerFragment,retryTransient,REFERENCE_UPLOAD_LIMIT,MAPPING_DRAFT_LIMIT,MODEL_REFERENCE_LIMIT,generationReferenceCount,assertGenerationReferenceLimit,candidateSide,isEditableTarget,imageFilesFromTransfer,dragPreviewSize,createTextEdit,createGroupedTextEdit,selectTextLinesInPolygon,upsertTextEdit,modifiedTextEdits,replaceMainImage,findTextRegion,mergeTypedCandidates,nextTypedCandidate,isEffectiveTextEdit} from '../前端代码/core.js';
+import {imageRect,referenceImageRect,detectedSelectionStatus,toImage,createMapping,createMainEditMapping,createMainEditTransient,commitMainEditTransient,addMapping,removeEmptyDraftMapping,consumePreviewSuppression,SerialActionQueue,UndoStack,LatestRequest,COLORS,normalizeEditorState,applyRecognizedLabel,composerMappingToken,mappingPreviewAssets,mappingPreviewKey,historyFrozenMappingInput,historySelectedPreviewAssets,historyDayKey,historyDayLabel,mergeHistoryItems,updateMappingLabel,composerEntries,confirmRequirement,cancelRequirementDraft,composerFragmentText,applyComposerFragment,retryTransient,REFERENCE_UPLOAD_LIMIT,MAPPING_DRAFT_LIMIT,MODEL_REFERENCE_LIMIT,generationReferenceCount,assertGenerationReferenceLimit,candidateSide,isEditableTarget,imageFilesFromTransfer,dragPreviewSize,paintMaskedDragPreview,createTextEdit,createGroupedTextEdit,textEditOverlayGeometry,selectTextLinesInPolygon,upsertTextEdit,modifiedTextEdits,replaceMainImage,findTextRegion,mergeTypedCandidates,nextTypedCandidate,isEffectiveTextEdit} from '../前端代码/core.js';
 
 test('letterbox coordinates remain stable across viewport sizes; margins reject points',()=>{
  for(const [w,h] of [[500,400],[200,700],[1200,500]]){const r=imageRect(w,h,1200,800);const p=toImage(r.x+r.width*.25,r.y+r.height*.75,r);assert.ok(Math.abs(p.x-.25)<1e-10);assert.ok(Math.abs(p.y-.75)<1e-10);assert.equal(toImage(r.x-1,r.y,r),null);}
@@ -163,6 +163,27 @@ test('clipboard and drop extraction accepts only supported image bytes and dedup
 test('masked drag preview preserves crop aspect ratio within its bounds',()=>{
  assert.deepEqual(dragPreviewSize([.1,.2,.9,.6],1000,500,120,96),{width:120,height:30});
  assert.deepEqual(dragPreviewSize([.2,.1,.4,.9],500,1000,120,96),{width:12,height:96});
+});
+
+test('masked drag preview keeps its CSS size while rendering at high DPI',()=>{
+ const calls=[],context={scale:(...args)=>calls.push(['scale',...args]),clearRect:(...args)=>calls.push(['clearRect',...args]),drawImage:(...args)=>calls.push(['drawImage',...args]),globalCompositeOperation:''};
+ const canvas={style:{},getContext:()=>context},image={width:1000,height:500},mask={width:1000,height:500};
+ assert.deepEqual(paintMaskedDragPreview(canvas,image,mask,[.1,.2,.9,.6],120,96,2),{width:120,height:30});
+ assert.equal(canvas.width,240);
+ assert.equal(canvas.height,60);
+ assert.equal(canvas.style.width,'120px');
+ assert.equal(canvas.style.height,'30px');
+ assert.deepEqual(calls[0],['scale',2,2]);
+});
+
+test('waiting text overlay uses the saved polygon instead of its oversized bbox',()=>{
+ const geometry=textEditOverlayGeometry({bbox:[.1,.2,.8,.7],polygon:[[.2,.3],[.5,.25],[.54,.4],[.24,.46]]});
+ assert.equal(geometry.source,'polygon');
+ assert.ok(Math.abs(geometry.left-.2)<1e-12&&Math.abs(geometry.top-.25)<1e-12&&Math.abs(geometry.width-.34)<1e-12&&Math.abs(geometry.height-.21)<1e-12);
+ assert.match(geometry.polygon,/polygon\(0\.000% 23\.810%,88\.235% 0\.000%/);
+ const fallback=textEditOverlayGeometry({bbox:[.1,.2,.4,.3]});
+ assert.equal(fallback.source,'bbox');
+ assert.equal(fallback.polygon,'polygon(0.000% 0.000%,100.000% 0.000%,100.000% 100.000%,0.000% 100.000%)');
 });
 
 test('main hover selection stays transient until non-empty text is confirmed',()=>{

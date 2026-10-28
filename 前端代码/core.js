@@ -6,6 +6,16 @@ export const MAIN_HOLD_MS=2000;
 export const generationReferenceCount=state=>(state.mappings?.length||0)+(state.full_image_refs?.length||0);
 export const isEffectiveTextEdit=edit=>{const original=String(edit?.original_text||'').trim(),replacement=String(edit?.replacement||'').trim();return !!replacement&&replacement!==original;};
 export const modifiedTextEdits=state=>(state.text_edits||[]).filter(isEffectiveTextEdit);
+export function textEditOverlayGeometry(edit){
+  const bbox=Array.isArray(edit?.bbox)&&edit.bbox.length===4?edit.bbox.map(Number):null;
+  const savedPolygon=Array.isArray(edit?.polygon)?edit.polygon.filter(point=>Array.isArray(point)&&point.length===2&&point.every(Number.isFinite)):[];
+  const points=savedPolygon.length>=3?savedPolygon:bbox?[[bbox[0],bbox[1]],[bbox[2],bbox[1]],[bbox[2],bbox[3]],[bbox[0],bbox[3]]]:[];
+  if(points.length<3)return null;
+  const normalized=points.map(([x,y])=>[Math.max(0,Math.min(1,Number(x))),Math.max(0,Math.min(1,Number(y)))]),left=Math.min(...normalized.map(point=>point[0])),top=Math.min(...normalized.map(point=>point[1])),right=Math.max(...normalized.map(point=>point[0])),bottom=Math.max(...normalized.map(point=>point[1])),width=right-left,height=bottom-top;
+  if(!(width>0&&height>0))return null;
+  const polygon=normalized.map(([x,y])=>`${((x-left)/width*100).toFixed(3)}% ${((y-top)/height*100).toFixed(3)}%`).join(',');
+  return {left,top,width,height,polygon:`polygon(${polygon})`,source:savedPolygon.length>=3?'polygon':'bbox'};
+}
 export const hasGenerationIntent=state=>!!((state.mappings?.length||0)||(state.full_image_refs?.length||0)||modifiedTextEdits(state).length||String(state.instructions||'').trim());
 export function mergeComposerGlobalText(current,standalone=[]){const lines=[String(current||''),...standalone].flatMap(text=>String(text||'').split('\n')).map(text=>text.trim()).filter(Boolean);return [...new Set(lines)].join('\n').slice(0,2000);}
 export function assertGenerationReferenceLimit(state){const count=generationReferenceCount(state);if(count>MODEL_REFERENCE_LIMIT)throw new Error(`当前共 ${count} 个实际参考输入，最多 ${MODEL_REFERENCE_LIMIT} 个；请删除部分元素操作或整图引用后再生成`);return count;}
@@ -63,7 +73,7 @@ export function candidateSide({activeSide=null,draggingSource=false,mainSelected
 export function isEditableTarget(target){return !!target&&(/^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)||target.isContentEditable||!!target.closest?.('[contenteditable="true"]'));}
 export function imageFilesFromTransfer(transfer){const supported=new Set(['image/jpeg','image/png','image/webp']),files=[...(transfer?.files||[])];for(const item of transfer?.items||[])if(item.kind==='file'){const file=item.getAsFile?.();if(file)files.push(file);}const seen=new Set();return files.filter(file=>{if(!supported.has((file.type||'').toLowerCase()))return false;const key=[file.name,file.type,file.size,file.lastModified].join(':');if(seen.has(key))return false;seen.add(key);return true;});}
 export function dragPreviewSize(bbox,imageWidth,imageHeight,maxWidth=120,maxHeight=96){const width=Math.max(1,(bbox[2]-bbox[0])*imageWidth),height=Math.max(1,(bbox[3]-bbox[1])*imageHeight),scale=Math.min(maxWidth/width,maxHeight/height);return {width:Math.max(1,Math.round(width*scale)),height:Math.max(1,Math.round(height*scale))};}
-export function paintMaskedDragPreview(canvas,image,mask,bbox,maxWidth=120,maxHeight=96){const size=dragPreviewSize(bbox,image.width,image.height,maxWidth,maxHeight),sx=bbox[0]*image.width,sy=bbox[1]*image.height,sw=(bbox[2]-bbox[0])*image.width,sh=(bbox[3]-bbox[1])*image.height,ctx=canvas.getContext('2d');canvas.width=size.width;canvas.height=size.height;ctx.clearRect(0,0,size.width,size.height);ctx.drawImage(image,sx,sy,sw,sh,0,0,size.width,size.height);ctx.globalCompositeOperation='destination-in';ctx.drawImage(mask,bbox[0]*mask.width,bbox[1]*mask.height,(bbox[2]-bbox[0])*mask.width,(bbox[3]-bbox[1])*mask.height,0,0,size.width,size.height);ctx.globalCompositeOperation='source-over';return size;}
+export function paintMaskedDragPreview(canvas,image,mask,bbox,maxWidth=120,maxHeight=96,pixelRatio=1){const size=dragPreviewSize(bbox,image.width,image.height,maxWidth,maxHeight),ratio=Math.max(1,Number(pixelRatio)||1),sx=bbox[0]*image.width,sy=bbox[1]*image.height,sw=(bbox[2]-bbox[0])*image.width,sh=(bbox[3]-bbox[1])*image.height,ctx=canvas.getContext('2d');canvas.width=Math.round(size.width*ratio);canvas.height=Math.round(size.height*ratio);canvas.style.width=size.width+'px';canvas.style.height=size.height+'px';ctx.scale(ratio,ratio);ctx.clearRect(0,0,size.width,size.height);ctx.drawImage(image,sx,sy,sw,sh,0,0,size.width,size.height);ctx.globalCompositeOperation='destination-in';ctx.drawImage(mask,bbox[0]*mask.width,bbox[1]*mask.height,(bbox[2]-bbox[0])*mask.width,(bbox[3]-bbox[1])*mask.height,0,0,size.width,size.height);ctx.globalCompositeOperation='source-over';return size;}
 export function shouldClearManualSelection({manual,point,contains,moved}){
   return !!(manual&&point&&!moved&&!contains());
 }

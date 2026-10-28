@@ -224,6 +224,63 @@ def me(request: Request):
     return {'user': request.state.user}
 
 
+@app.get('/api/account/credits')
+def account_credits(request: Request, limit: int = 50):
+    return store.credit_summary(request.state.user['id'], limit)
+
+
+def require_admin_user(request):
+    if request.state.user.get('role') != 'admin':
+        raise HTTPException(403, '仅管理员可以执行此操作')
+    return request.state.user
+
+
+@app.get('/api/admin/users')
+def admin_users(request: Request, q: str = ''):
+    require_admin_user(request)
+    keyword = q.strip()
+    with store.db() as con:
+        params = []
+        where = ''
+        if keyword:
+            where = "WHERE u.email LIKE ? ESCAPE '\\'"
+            escaped = keyword.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+            params.append(f'%{escaped}%')
+        rows = con.execute(f'''SELECT u.id,u.email,u.role,u.created,
+          COALESCE((SELECT SUM(l.amount) FROM credit_ledger l WHERE l.user_id=u.id),0) AS balance,
+          COALESCE((SELECT SUM(-l.amount) FROM credit_ledger l WHERE l.user_id=u.id AND l.amount<0),0) AS spent,
+          (SELECT MAX(j.created) FROM jobs j WHERE j.user_id=u.id) AS last_generation
+          FROM users u {where} ORDER BY u.created DESC LIMIT 100''', params).fetchall()
+    return {'items': [dict(row) for row in rows]}
+
+
+@app.get('/api/admin/users/{user_id}/credits')
+def admin_user_credits(user_id: str, request: Request, limit: int = 100):
+    require_admin_user(request)
+    with store.db() as con:
+        user = con.execute('SELECT id,email,role,created FROM users WHERE id=?', (user_id,)).fetchone()
+    if not user:
+        raise HTTPException(404, '用户不存在')
+    return {'user': dict(user), **store.credit_summary(user_id, limit)}
+
+
+@app.post('/api/admin/users/{user_id}/credits')
+async def admin_adjust_credits(user_id: str, request: Request):
+    admin = require_admin_user(request)
+    body = await request.json()
+    amount = body.get('amount')
+    note = str(body.get('note') or '').strip()
+    if isinstance(amount, bool) or not isinstance(amount, int) or amount == 0 or abs(amount) > 100000:
+        raise HTTPException(400, '请输入 1 到 100000 之间的充值或扣减数量')
+    if len(note) < 2 or len(note) > 300:
+        raise HTTPException(400, '请填写 2 到 300 字的调整原因')
+    summary = store.credit_summary(user_id, 1)
+    if amount < 0 and summary['balance'] + amount < summary['reserved']:
+        raise HTTPException(409, '扣减后积分不足以支付正在生成的任务')
+    result = store.add_credits(user_id, amount, 'admin_adjustment', note, operator_user_id=admin['id'])
+    return {'ok': True, **result}
+
+
 @app.get('/api/inspiration')
 def inspiration_list(request: Request, category: str = 'all'):
     user = getattr(request.state, 'user', None)
@@ -369,14 +426,16 @@ async def upload(request: Request, file: UploadFile = File(...), pre_recognition
 
 
 @app.get('/api/assets/{aid}/meta')
-def meta(aid: str):
-    data = store.asset(aid).copy(); data.pop('path'); return data
+def meta(aid: str, request: Request):
+    data = store.asset(aid, user_id=None if request.state.user.get('role') == 'admin' else request.state.user['id']).copy()
+    data.pop('path'); return data
 
 
 @app.get('/api/assets/{aid}')
-def asset_file(aid: str, thumbnail: bool = False, download: bool = False):
-    data = store.asset(aid)
-    path = config.DATA / (f'assets/{aid}.thumb.png' if thumbnail else data['path'])
+def asset_file(aid: str, request: Request, thumbnail: bool = False, download: bool = False):
+    data = store.asset(aid, user_id=None if request.state.user.get('role') == 'admin' else request.state.user['id'])
+    thumb = config.DATA / f'assets/{aid}.thumb.png'
+    path = thumb if thumbnail and thumb.is_file() else config.DATA / data['path']
     return FileResponse(path, media_type='image/png', filename=f'image-edit-{aid[:8]}.png' if download else None)
 
 
@@ -526,6 +585,9 @@ async def submit(request: Request):
         raise HTTPException(409, '请先保存当前草稿')
     overlaps = await run_in_threadpool(store.validate, state, True, data.get('allow_overlap') is True)
     if config.MODE == 'live':
+        credits = store.credit_summary(request.state.user['id'], 1)
+        if credits['available'] < 1:
+            raise HTTPException(402, '积分不足，成功生成一次需要 1 积分')
         if not config.EXPERIMENTAL:
             raise HTTPException(409, '真实生成尚未通过能力门禁；需明确开启实验性接入')
         await run_in_threadpool(provider.preflight, selected_model)
@@ -536,6 +598,14 @@ async def submit(request: Request):
     jid = store.uid()
     with store.db() as con:
         try:
+            if config.MODE == 'live':
+                # Serialize the final availability check with job creation so
+                # simultaneous submissions cannot overbook the same balance.
+                con.execute('BEGIN IMMEDIATE')
+                balance = store.credit_balance(request.state.user['id'], con)
+                reserved = con.execute("SELECT COUNT(*) FROM jobs WHERE user_id=? AND status IN ('queued','running','saving') AND json_extract(snapshot,'$.mode')='live'", (request.state.user['id'],)).fetchone()[0]
+                if balance - reserved < 1:
+                    raise HTTPException(402, '积分不足，成功生成一次需要 1 积分')
             con.execute('INSERT INTO jobs(id,idem,created,status,snapshot,user_id) VALUES(?,?,?,?,?,?)',
                         (jid, idem_scope, time.time(), 'queued', json.dumps(snapshot), request.state.user['id']))
         except sqlite3.IntegrityError:
@@ -554,12 +624,13 @@ def public_job(data):
 
 
 @app.get('/api/jobs')
-def history(request: Request, status: str = 'all', offset: int = 0, q: str = ''):
+def history(request: Request, status: str = 'all', offset: int = 0, q: str = '', user_id: str = ''):
     offset = max(0, offset)
     keyword = q.strip()
     with store.db() as con:
+        admin_view = request.state.user.get('role') == 'admin' and bool(user_id)
         where = ['deleted=0', 'user_id=?']
-        params = [request.state.user['id']]
+        params = [user_id if admin_view else request.state.user['id']]
         if status != 'all':
             where.append('status=?'); params.append(status)
         if keyword:
@@ -571,9 +642,13 @@ def history(request: Request, status: str = 'all', offset: int = 0, q: str = '')
         rows = con.execute(f'SELECT id FROM jobs WHERE {clause} ORDER BY created DESC, id DESC LIMIT 20 OFFSET ?', [*params, offset]).fetchall()
     result = []
     for row in rows:
-        item = public_job(store.job(row['id'], user_id=request.state.user['id']))
+        item = public_job(store.job(row['id'], user_id=None if admin_view else request.state.user['id']))
         state = item['snapshot']['state']
-        result.append({k: item[k] for k in ('id', 'created', 'status', 'result', 'name')} | {'main_image': state['main_image'], 'count': len(state.get('mappings', [])) + len(state.get('text_edits', [])) + len(state.get('full_image_refs', []))})
+        owner = None
+        if admin_view:
+            with store.db() as con:
+                owner = con.execute('SELECT email FROM users WHERE id=?', (item['user_id'],)).fetchone()
+        result.append({k: item[k] for k in ('id', 'created', 'status', 'result', 'name')} | {'main_image': state['main_image'], 'count': len(state.get('mappings', [])) + len(state.get('text_edits', [])) + len(state.get('full_image_refs', [])), 'owner_email': owner['email'] if owner else None})
     next_offset = offset + len(result) if offset + len(result) < count else None
     return {'items': result, 'count': count, 'next_offset': next_offset}
 
@@ -594,7 +669,7 @@ async def rename_history(jid: str, request: Request):
 
 @app.get('/api/jobs/{jid}')
 def detail(jid: str, request: Request):
-    return public_job(store.job(jid, user_id=request.state.user['id']))
+    return public_job(store.job(jid, user_id=None if request.state.user.get('role') == 'admin' else request.state.user['id']))
 
 
 @app.delete('/api/jobs/{jid}')

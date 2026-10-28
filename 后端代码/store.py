@@ -70,6 +70,19 @@ def init():
         con.execute('CREATE INDEX IF NOT EXISTS drafts_user_idx ON drafts(user_id,updated DESC)')
         con.execute('CREATE INDEX IF NOT EXISTS jobs_user_idx ON jobs(user_id,created DESC)')
         con.execute('CREATE INDEX IF NOT EXISTS auth_tokens_user_idx ON auth_tokens(user_id,purpose)')
+        con.execute('''CREATE TABLE IF NOT EXISTS credit_ledger(
+          id TEXT PRIMARY KEY, user_id TEXT NOT NULL, amount INTEGER NOT NULL,
+          kind TEXT NOT NULL, note TEXT NOT NULL DEFAULT '', job_id TEXT,
+          operator_user_id TEXT, created REAL NOT NULL,
+          FOREIGN KEY(user_id) REFERENCES users(id),
+          FOREIGN KEY(operator_user_id) REFERENCES users(id))''')
+        con.execute('CREATE INDEX IF NOT EXISTS credit_ledger_user_idx ON credit_ledger(user_id,created DESC)')
+        con.execute('CREATE UNIQUE INDEX IF NOT EXISTS credit_ledger_job_charge_idx ON credit_ledger(job_id,kind) WHERE job_id IS NOT NULL')
+        # Accounts created before credits existed receive the same one-time welcome grant.
+        con.execute('''INSERT INTO credit_ledger(id,user_id,amount,kind,note,created)
+          SELECT lower(hex(randomblob(16))),u.id,100,'welcome','新用户注册赠送',u.created
+          FROM users u WHERE NOT EXISTS(
+            SELECT 1 FROM credit_ledger l WHERE l.user_id=u.id AND l.kind='welcome')''')
         columns = {row['name'] for row in con.execute('PRAGMA table_info(jobs)')}
         if 'display_name' not in columns:
             con.execute('ALTER TABLE jobs ADD COLUMN display_name TEXT')
@@ -361,3 +374,59 @@ def job(jid, include_deleted=False, user_id=None):
 def update_job(jid, status, result):
     with db() as con:
         con.execute('UPDATE jobs SET status=?,result=? WHERE id=?', (status, json.dumps(result), jid))
+
+
+def credit_balance(user_id, con=None):
+    if con is not None:
+        return con.execute('SELECT COALESCE(SUM(amount),0) FROM credit_ledger WHERE user_id=?', (user_id,)).fetchone()[0]
+    with db() as connection:
+        return credit_balance(user_id, connection)
+
+
+def add_credits(user_id, amount, kind, note='', job_id=None, operator_user_id=None):
+    if not isinstance(amount, int) or amount == 0:
+        raise HTTPException(400, '积分变动必须是非零整数')
+    with db() as con:
+        if not con.execute('SELECT 1 FROM users WHERE id=?', (user_id,)).fetchone():
+            raise HTTPException(404, '用户不存在')
+        before = credit_balance(user_id, con)
+        if before + amount < 0:
+            raise HTTPException(409, '用户积分不足，不能扣减到负数')
+        try:
+            ledger_id = uid()
+            con.execute('''INSERT INTO credit_ledger(id,user_id,amount,kind,note,job_id,operator_user_id,created)
+              VALUES(?,?,?,?,?,?,?,?)''', (ledger_id, user_id, amount, kind, str(note or '')[:300], job_id,
+                                         operator_user_id, time.time()))
+        except sqlite3.IntegrityError:
+            if job_id:
+                row = con.execute('SELECT id FROM credit_ledger WHERE job_id=? AND kind=?', (job_id, kind)).fetchone()
+                if row:
+                    return {'id': row['id'], 'balance': credit_balance(user_id, con), 'created': False}
+            raise
+        return {'id': ledger_id, 'balance': before + amount, 'created': True}
+
+
+def credit_summary(user_id, limit=50):
+    with db() as con:
+        rows = con.execute('''SELECT l.*,j.display_name,json_extract(j.snapshot,'$.state.name') AS job_name,
+          o.email AS operator_email FROM credit_ledger l
+          LEFT JOIN jobs j ON j.id=l.job_id LEFT JOIN users o ON o.id=l.operator_user_id
+          WHERE l.user_id=? ORDER BY l.created DESC,l.id DESC LIMIT ?''', (user_id, max(1, min(limit, 200)))).fetchall()
+        balance = credit_balance(user_id, con)
+        reserved = con.execute("SELECT COUNT(*) FROM jobs WHERE user_id=? AND status IN ('queued','running','saving') AND json_extract(snapshot,'$.mode')='live'", (user_id,)).fetchone()[0]
+    running = 0
+    items = [dict(row) | {'title': row['display_name'] or row['job_name']} for row in rows]
+    # Derive historical balances from the current balance without storing mutable snapshots.
+    for item in items:
+        item['balance_after'] = balance - running
+        running += item['amount']
+        item.pop('display_name', None); item.pop('job_name', None)
+    return {'balance': balance, 'reserved': reserved, 'available': max(0, balance - reserved), 'items': items}
+
+
+def charge_successful_job(jid):
+    with db() as con:
+        row = con.execute('SELECT user_id,status FROM jobs WHERE id=?', (jid,)).fetchone()
+        if not row or row['status'] != 'succeeded':
+            return None
+    return add_credits(row['user_id'], -1, 'generation', '图片生成成功', job_id=jid)

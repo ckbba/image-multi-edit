@@ -31,7 +31,17 @@ def test_auth_dialog_close_bypasses_validation_and_cancels_pending_action():
     assert 'class="auth-close" type="button" aria-label="关闭"' in APP
     assert "dialog.querySelector('.auth-close').onclick=()=>{pendingAuthAction=null;dialog.close('cancel');}" in APP
     assert "dialog.addEventListener('cancel',()=>{pendingAuthAction=null;});" in APP
-    assert '/static/app.js?v=accounts-7' in INDEX
+    assert '/static/app.js?v=history-text-regions-1' in INDEX
+    assert '/static/account.css?v=3' in INDEX
+
+
+def test_private_navigation_prompts_for_login_and_resumes_after_authentication():
+    assert "pathname==='/'" in APP
+    assert "pathname==='/drive'" in APP
+    assert "pathname==='/history'" in APP
+    assert "if(!currentUser&&requiresLogin(path))return requireAuth(()=>navigate(path));" in APP
+    assert 'const action=pendingAuthAction' in APP
+    assert 'if(action)await action();' in APP
 
 
 def test_email_verification_and_password_recovery_ui_are_wired():

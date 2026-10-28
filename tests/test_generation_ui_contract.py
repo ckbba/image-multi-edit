@@ -17,3 +17,24 @@ def test_composer_sync_collects_free_text_outside_fragments():
 def test_global_prompt_guidance_names_main_image_without_promising_fidelity():
     assert '主图（IMAGE 1）' in APP
     assert '尽量保留' in APP
+
+
+def test_waiting_overlay_distinguishes_text_edits_from_image_mappings():
+    assert 'textEdits=modifiedTextEdits(snapshot).map' in APP
+    assert 'textEditOverlayGeometry(edit)' in APP
+    assert 'generation-wait-text' in APP
+    assert 'data-region-source="${geometry.source}"' in APP
+    assert "textEdits.length?'':'<i class=\"generation-wait-region whole-image\"" in APP
+
+
+def test_history_comparison_never_reveals_edit_annotations():
+    assert 'historyBubbles.hidden=historyTextLayer.hidden=!regionsVisible' in APP
+    assert 'if(regionPanel.hidden||Number(regionSelect?.value)!==mainRegionIndex||!historyTextEdits.length)' in APP
+    assert 'const geometry=textEditOverlayGeometry(edit)' in APP
+    assert 'clipPath:geometry.polygon' in APP
+
+
+def test_mapping_hover_compares_selected_object_with_truthful_model_input():
+    assert '选中的源对象' in APP
+    assert '实际模型输入' in APP
+    assert 'mapping-comparison-preview' in APP

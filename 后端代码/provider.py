@@ -257,6 +257,7 @@ def save_outputs(jid):
             store.update_job(jid, 'saving', result)
         result.pop('error', None)
         store.update_job(jid, 'succeeded', result)
+        store.charge_successful_job(jid)
     except Exception as exc:
         result['error'] = f'结果已生成但保存失败：{type(exc).__name__}；可重试保存，不会再次生图'
         store.update_job(jid, 'save_failed', result)
